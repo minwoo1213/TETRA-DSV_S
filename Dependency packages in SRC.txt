@@ -1,0 +1,19 @@
+// tetraDS-S dependency packages in SRC ... mwcha //
+
+ar_tag_demo
+ar_track_alvar-melodic-devel
+custom_msgs
+cyglidar_d1-0.2.0
+depthimage_to_laserscan-melodic-devel
+joy_tetra
+object_msgs-master
+pointcloud_to_laserscan_melodic
+pykalman-master
+realsense-ros
+RestrictAreaPlugin-master
+rviz_visual_tools-melodic-devel
+sick_tim-kinetic
+spatio_temporal_voxel_layer-melodic-devel
+unique_identifier-master
+vision_opencv
+timed_roslaunch

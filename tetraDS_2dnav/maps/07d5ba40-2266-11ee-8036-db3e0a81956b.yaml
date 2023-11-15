@@ -1,0 +1,7 @@
+image: 07d5ba40-2266-11ee-8036-db3e0a81956b.pgm
+resolution: 0.050000
+origin: [-12.050013, -16.683060, 0.000000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+
