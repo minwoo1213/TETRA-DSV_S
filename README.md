@@ -1,4 +1,4 @@
-# minwoo_exfp
+# TETRA-DSV_S
 
 #### [기본적인 SRC는 M 모델과 동일합니다.](https://github.com/minwoo1213/TETRA-DSV_M)
 #### [The basic source code is the same as the M model.](https://github.com/minwoo1213/TETRA-DSV_M)
