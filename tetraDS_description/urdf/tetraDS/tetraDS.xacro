@@ -104,23 +104,7 @@
     <child link="Front_bumper" />
   </joint>
 
-
- <link name="camera1_link">
-      <visual>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <box size="0.01 0.01 0.01" />
-        </geometry>
-        <material name="Grey" />
-      </visual>
-  </link>
-
-  <joint name="camera1_link" type="fixed">
-    <!--<origin xyz="0.1553 -0.1155 0.0" rpy="3.14 -0.261799 0" />-->
-    <origin xyz="0.1347 0.0 0.1344" rpy="0 0 0" />
-    <parent link="base_link"/>
-    <child link="camera1_link" />
-  </joint>
+<!-- 240314 mwcha Removed 'camera1_link' because S model just have a single depth camera -->
 
    <link name="camera2_link">
       <visual>
@@ -134,7 +118,7 @@
 
   <joint name="camera2_link" type="fixed">
     <!--<origin xyz="0.1553 -0.1155 0.0" rpy="3.14 -0.261799 0" />-->
-    <origin xyz="-0.3118 0.0 0.1985" rpy="0 0 ${PI}" />
+    <origin xyz="0.1347 0.0 0.1344" rpy="0 0 0" />
     <parent link="base_link"/>
     <child link="camera2_link" />
   </joint>
@@ -164,6 +148,5 @@
 
 
 </robot>
-
 
 
