@@ -121,7 +121,7 @@
     <parent link="base_link"/>
     <child link="camera1_link" />
   </joint>
-<!--
+
    <link name="camera2_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0" />
@@ -130,14 +130,14 @@
         </geometry>
         <material name="Grey" />
       </visual>
-  </link> 240314 -->
-<!--
-  <joint name="camera2_link" type="fixed"> -->
-    <!--<origin xyz="0.1553 -0.1155 0.0" rpy="3.14 -0.261799 0" />--> <!--
+  </link>
+
+  <joint name="camera2_link" type="fixed">
+    <!--<origin xyz="0.1553 -0.1155 0.0" rpy="3.14 -0.261799 0" />-->
     <origin xyz="-0.3118 0.0 0.1985" rpy="0 0 ${PI}" />
     <parent link="base_link"/>
     <child link="camera2_link" />
-  </joint>-->
+  </joint>
 
  <link name="base_Upperlink">
    <visual>
