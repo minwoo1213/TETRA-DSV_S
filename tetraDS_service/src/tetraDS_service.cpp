@@ -1,6 +1,4 @@
-//// TETRA_DS Service ROS Package_Ver 231115 ////
-//// 231115 last adjust by mwcha ... TETRA-DS-S ////
-
+////TETRA_DS Service ROS Package_Ver 0.1
 #include <ros/ros.h>
 #include <ros/master.h> // add_move_base die check
 #include <ros/this_node.h> // add_move_base die check
@@ -30,7 +28,7 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Header.h>
 #include <std_srvs/Empty.h>
-#include <std_srvs/SetBool.h> //add ... cygbot Local costmap toggle_enabled
+#include <std_srvs/SetBool.h> //add...cygbot Local costmap toggle_enabled
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/PointCloud2.h> //bumper
 #include <sensor_msgs/Joy.h> //add 
@@ -105,7 +103,7 @@ using namespace rapidjson;
 #include "tetraDS_service/unloadingcheck.h" //SRV
 //add patrol service//
 #include "tetraDS_service/patrol.h" //SRV
-//#include "tetraDS_service/patrol_conveyor.h" //SRV ... 230707 mwcha
+//#include "tetraDS_service/patrol_conveyor.h" //SRV
 #include "tetraDS_service/conveyor_auto_movement.h" //SRV
 //add delete data all service//
 #include "tetraDS_service/deletedataall.h" //SRV
@@ -132,13 +130,12 @@ using namespace rapidjson;
 #include "tetraDS_service/reboot_sensor.h"
 //robot_localization//
 #include "tetraDS_service/SetPose.h"
-//Home ID Set Service//
-#include "tetraDS_service/sethome_id.h"
 //Set EKF & IMU Reset Service//
 #include "tetraDS_service/setekf.h"
 
-#define HIGH_BATTERY 80
-#define LOW_BATTERY 30
+
+#define HIGH_BATTERY 95
+#define LOW_BATTERY 15
 #define MAX_RETRY_CNT 99
 #define BUF_LEN 4096
 using namespace std;
@@ -151,15 +148,11 @@ int status;
 char Textbuffer[BUF_LEN];
 
 //test... Marker Tracking & Front docking...
-//int EX_MARKER_ID = 0; ... 230707 mwcha
+int EX_MARKER_ID = 0;
 int m_iParticleCloud_size = 0;
 pthread_t p_docking_thread;
 pthread_t p_auto_thread;
 int  m_iRetry_cnt = 0;
-int m_iDepart_Station2Move_cnt = 0;
-string m_strLog = "";
-string m_strLog_data_1 = "";
-string m_strLog_data_2 = "";
 //Docking Command //
 int ex_iDocking_CommandMode = 0;
 int m_iDocking_timeout_cnt = 0;
@@ -173,7 +166,7 @@ string arr_patrol_location[255] = {"", };
 int  m_iTimer_cnt = 0;
 // Active map Check //
 bool m_bActive_map_check = false;
-
+//add...220608
 double m_dTF_Yaw = 0.0;
 double m_dTF_New_Pose_X = 0.0;
 double m_dTF_New_Pose_Y = 0.0;
@@ -186,8 +179,6 @@ int m_iViaPoint_Index = 0;
 bool m_bFlag_nomotion_call = false;
 //clesr_costmap service call...
 bool m_flag_clesr_costmap_call = false;
-//virtualWallCheck ... 231115 add
-bool m_bFlag_virtualWallCheck = true;
 //Dynamic_reconfigure call flag//
 bool m_flag_Dynamic_reconfigure_call = false;
 bool m_flag_Dynamic_TebMarkers_major_update = false;
@@ -203,6 +194,8 @@ bool m_flag_PREEMPTED = false;
 bool m_flag_SpeedZone = false;
 bool m_flag_major_update[255] = {false, };
 bool m_flag_minor_update[255] = {false, };
+//virtualWallCheck ... 231115 add
+bool m_bFlag_virtualWallCheck = true;
 
 //Speed Zone Point...
 typedef struct TAGPOINT
@@ -210,10 +203,12 @@ typedef struct TAGPOINT
     double x;
     double y;
 }POINT, *PPOINT;
+
 typedef struct TAGLIST
 {
     POINT _pTagPoint[4] = {0.0, };
     double dSpeed_value = 0.0;
+
 }TAGLIST;
 TAGLIST _pTagList[255];
 
@@ -224,6 +219,7 @@ typedef struct WALL_DATA_POINT
     double m_dform_x[4] = {0.0, };
     double m_dform_y[4] = {0.0, };
     double m_dform_z[4] = {0.0, };
+
 }WALL_DATA_POINT;
 WALL_DATA_POINT _pWallDataPoint;
 
@@ -234,13 +230,14 @@ typedef struct ZONE_DATA_POINT
     double m_dform_x2[2] = {0.0, };
     double m_dform_y2[2] = {0.0, };
     double m_dform_z2[2] = {0.0, };
+
 }ZONE_DATA_POINT;
 ZONE_DATA_POINT _pZoneDataPoint;
 
 typedef struct HOME_POSE
 {
     string HOME_strLOCATION = "HOME";
-    double HOME_dPOSITION_X = -0.6; // 230707 mwcha EKF HOME
+    double HOME_dPOSITION_X = -0.6;
     double HOME_dPOSITION_Y = 0.0;
     double HOME_dPOSITION_Z = 0.0;
     double HOME_dQUATERNION_X = 0.0;
@@ -270,7 +267,7 @@ typedef struct FALG_VALUE
 {
     bool m_bflag_NextStep = false;
     bool m_bflag_ComebackHome = false;
-    bool m_bflag_DockingExit = false;
+    bool m_bfalg_DockingExit = false;
     bool m_bflag_Conveyor_docking = false;
     bool m_bFlag_Disable_bumper = false;
     bool m_Onetime_reset_flag = false;
@@ -281,7 +278,7 @@ typedef struct FALG_VALUE
     //PCL obstacle Check//
     bool m_bFlag_Obstacle_PCL1 = false;
     bool m_bFlag_Obstacle_PCL2 = false;
-    //Cygbot Check// add 230707 mwcha
+    //Cygbot Check//
     bool m_bFlag_Obstacle_cygbot = false;
     //Error Flag//
     bool m_bumperhit_flag = false;
@@ -297,10 +294,11 @@ typedef struct FALG_VALUE
     bool m_bCorneringFlag = true;
     //no motion service call flag//
     bool m_bFlag_nomotion = true;
-    bool m_bflag_auto_patrol = false; // add mwcha 230707
+    bool m_bflag_auto_patrol = false;
     bool m_bFlag_Initialpose = false;
     //Setgoal_pub flag//
     bool m_bFlag_pub = false;
+
 
 }FALG_VALUE;
 FALG_VALUE _pFlag_Value;
@@ -326,7 +324,7 @@ typedef struct AMCL_POSE
     double poseAMCLqx = 0.0;
     double poseAMCLqy = 0.0;
     double poseAMCLqz = 0.0;
-    double poseAMCLqw = 1.0; //0.0
+    double poseAMCLqw = 1.0;
 
 }AMCL_POSE;
 AMCL_POSE _pAMCL_pose;
@@ -340,7 +338,7 @@ typedef struct TF_POSE
     double poseTFqx = 0.0;
     double poseTFqy = 0.0;
     double poseTFqz = 0.0;
-    double poseTFqw = 0.0; //1.0
+    double poseTFqw = 0.0;
 
 }TF_POSE;
 TF_POSE _pTF_pose;
@@ -354,7 +352,7 @@ typedef struct TF_POSE2
     double poseTFqx2 = 0.0;
     double poseTFqy2 = 0.0;
     double poseTFqz2 = 0.0;
-    double poseTFqw2 = 0.0; //1.0
+    double poseTFqw2 = 0.0;
 
 }TF_POSE2;
 TF_POSE2 _pTF_pose2;
@@ -368,7 +366,7 @@ typedef struct GOAL_POSE
     float goal_quarterX = 0.0;
     float goal_quarterY = 0.0;
     float goal_quarterZ = 0.0;
-    float goal_quarterW = 0.0; //1.0
+    float goal_quarterW = 0.0;
 
 }GOAL_POSE;
 GOAL_POSE _pGoal_pose;
@@ -391,6 +389,11 @@ typedef struct ROBOT_STATUS
     int HOME_ID = 0; //Docking ID Param Read//
     int CONVEYOR_ID = 0;
     int CONVEYOR_MOVEMENT = 0; // 0: nomal , 1: Loading , 2: Unloading
+    //add..Total Distance ... 240129 mwcha
+    double m_cmd_vel = 0.0;
+    double m_backmove_cmd = 0.0;
+    double m_dTotal_Distance = 0.0;
+    double m_dGoal_Distance = 0.0;
 
 }ROBOT_STATUS;
 ROBOT_STATUS _pRobot_Status;
@@ -426,6 +429,7 @@ float m_Ultrasonic_DL_Range = 0.0;
 float m_Ultrasonic_DR_Range = 0.0;
 float m_Ultrasonic_RL_Range = 0.0;
 float m_Ultrasonic_RR_Range = 0.0;
+
 //roslaunch mode check//
 int ex_ilaunchMode = 0;
 
@@ -474,6 +478,9 @@ move_base_msgs::MoveBaseActionGoal goal;
 //Docking_progress
 ros::Publisher docking_progress_pub;
 std_msgs::Int32 docking_progress;
+// Docking positioning//
+ros::Publisher positioning_pub;
+geometry_msgs::Pose2D positioning_pose;
 
 //Virtual Costmap//
 ros::Publisher virtual_obstacle_pub;
@@ -483,12 +490,6 @@ virtual_costmap_layer::Obstacles virtual_obstacle;
 ros::Publisher virtual_obstacle2_pub;
 //custom_msgs::Obstacles virtual_obstacle2;
 virtual_costmap_layer2::Obstacles2 virtual_obstacle2;
-
-/*
-// Docking positioning//
-ros::Publisher positioning_pub;
-geometry_msgs::Pose2D positioning_pose;
-*/
 
 //**Command srv _ Service Server************************/
 tetraDS_service::getlocation getlocation_cmd;
@@ -567,7 +568,6 @@ tetraDS_service::setekf set_ekf_cmd;
 ros::ServiceServer set_ekf_service;
 
 //**Command srv _ Service Client************************/
-
 //Usb_cam Service Client//
 ros::ServiceClient usb_cam_On_client;
 ros::ServiceClient usb_cam_Off_client;
@@ -592,6 +592,7 @@ tetraDS_service::toggleon turnon_srv;
 actionlib_msgs::GoalID goto_goal_id;
 //Clear costmap Service Client//
 ros::ServiceClient clear_costmap_client;
+
 //robot_localization Service Client//
 ros::ServiceClient SetPose_cmd_client;
 tetraDS_service::SetPose setpose_srv;
@@ -627,6 +628,8 @@ visualization_msgs::Marker node_name;
 ros::Publisher landmark_pub2;
 visualization_msgs::Marker node2;
 visualization_msgs::Marker node_name2;
+
+
 //IMU Service Client//
 ros::ServiceClient all_data_reset_cmd_client;
 tetraDS_service::all_data_reset all_data_reset_srv;
@@ -639,20 +642,24 @@ tetraDS_service::pose_velocity_reset pose_velocity_reset_srv;
 ros::ServiceClient reboot_sensor_cmd_client;
 tetraDS_service::reboot_sensor reboot_sensor_srv;
 
-//************************************************************************************************************************//
 //Cygbot local costmap toggle_enabled flag//
 bool m_bToggle_enabled_flag1 = false;
 bool m_bToggle_enabled_flag2 = false;
+
 //SpeedZone
 vector<POINT> vV[255];
+
+
 //Read virtual_wall JSON **************************************************************************************************************//
 bool Read_virtual_wall_JSON()
 {
     bool bResult = false;
     int iInt_count = 0;
     int iNext_count = 0;
+
     //read file path
     std::ifstream ifs("/home/tetra/virtualwall.json");
+
     //View _Ignition Point to Text...
     node_name.header.frame_id = "/map";
     node_name.header.stamp = ros::Time(0);
@@ -660,12 +667,14 @@ bool Read_virtual_wall_JSON()
     node_name.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
     node_name.action = visualization_msgs::Marker::DELETEALL;
     landmark_pub.publish(node_name);
+
     if(ifs)
     {
         printf("[success]: virtualwall json file read OK !! \n"); 
         IStreamWrapper isw(ifs);
         Document doc;
         doc.ParseStream(isw);
+
         virtual_obstacle.list.clear();
         //Global_costmap Loop//
         virtual_obstacle.list.resize(doc["list_count"].Size());
@@ -681,6 +690,7 @@ bool Read_virtual_wall_JSON()
                 
             }
             iNext_count += iInt_count;
+
             //View _Ignition Point to Text...
             node_name.header.frame_id = "/map";
             node_name.header.stamp = ros::Time(0);
@@ -698,10 +708,14 @@ bool Read_virtual_wall_JSON()
             node_name.scale.z = 0.6;
             //Publish_maker_text
             landmark_pub.publish(node_name);
+
             usleep(10000); //10ms
+
         }
         virtual_obstacle_pub.publish(virtual_obstacle);
+
         _pWallDataPoint.m_ilist_count_size = doc["list_count"].Size(); //index Update
+
         bResult = true;          
     }
     else
@@ -709,16 +723,20 @@ bool Read_virtual_wall_JSON()
         printf("[fail]: virtualwall json file read fail !! \n"); 
         bResult = false;
     }
+
     return bResult;
 }
+
 //Read speed zone JSON ***************************************************************************************************************//
 bool Read_speed_zone_JSON()
 {
     bool bResult = false;
     int iInt_count = 0;
     int iNext_count = 0;
+
     //read file path
     std::ifstream ifs("/home/tetra/speedzone.json");
+
     //View _Ignition Point to Text...
     node_name2.header.frame_id = "/map";
     node_name2.header.stamp = ros::Time(0);
@@ -726,12 +744,15 @@ bool Read_speed_zone_JSON()
     node_name2.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
     node_name2.action = visualization_msgs::Marker::DELETEALL;
     landmark_pub2.publish(node_name2);
+
     if(ifs)
     {
         printf("[success]: speedzone json file read OK !! \n"); 
         IStreamWrapper isw(ifs);
         Document doc;
         doc.ParseStream(isw);
+
+
         for(rapidjson::SizeType i=0; i < doc["tag_list"].Size(); i++)
         {
             iInt_count = doc["tag_list"][i].GetInt();
@@ -739,13 +760,17 @@ bool Read_speed_zone_JSON()
             {
                 _pTagList[i]._pTagPoint[j] = {floor(doc["form_x"][iNext_count + j].GetDouble() * 1000.f + 0.5) / 1000.f,
                                               floor(doc["form_y"][iNext_count + j].GetDouble() * 1000.f + 0.5) / 1000.f};
+
                 vV[i].push_back(_pTagList[i]._pTagPoint[j]);
+
                 //printf("_pTagList[%d]._pTagPoint[%d].x: %.3f , _pTagList[%d]._pTagPoint[%d].y: %.3f \n",i,j,_pTagList[i]._pTagPoint[j].x, i,j,_pTagList[i]._pTagPoint[j].y);
             
             }
             iNext_count += iInt_count;
+
             // Set Speed
             _pTagList[i].dSpeed_value = doc["speed"][i].GetDouble();
+
             //View _Ignition Point...
             node2.header.frame_id = "/map";
             node2.header.stamp = ros::Time(0); //ros::Time::now(); 
@@ -772,6 +797,8 @@ bool Read_speed_zone_JSON()
             node2.lifetime = ros::Duration(0.0);
             //Publish
             landmark_pub2.publish(node2);
+
+
             //View _Ignition Point to Text...
             node_name2.header.frame_id = "/map";
             node_name2.header.stamp = ros::Time(0);
@@ -789,13 +816,17 @@ bool Read_speed_zone_JSON()
             node_name2.scale.z = 0.5;
             //Publish_maker_text
             landmark_pub2.publish(node_name2);
+
             usleep(10000); //10ms
+
         }
         
         _pZoneDataPoint.m_iZone_count = doc["tag_list"].Size(); //index Update
         //printf("_pZoneDataPoint.m_iZone_count: %d \n", _pZoneDataPoint.m_iZone_count);
+
         if(_pZoneDataPoint.m_iZone_count > 0)
             m_flag_SpeedZone = true;
+
         bResult = true;          
     }
     else
@@ -803,15 +834,18 @@ bool Read_speed_zone_JSON()
         printf("[fail]: speedzone json file read fail !! \n"); 
         bResult = false;
     }
-	
+
+
     return bResult;
 }
+
 //************************************************************************************************************************************//
 //Polygon Inside or Outside Check algorithm//
 bool isinner(POINT _CurrentPos, vector<POINT> _vVertex)
 {
     int iSize = _vVertex.size();
     int iCount = 0;
+
     for(int i=0; i < iSize; i++)
     {
         int j = (i + 1) % iSize;
@@ -822,6 +856,7 @@ bool isinner(POINT _CurrentPos, vector<POINT> _vVertex)
             S[0] = _vVertex[j].x - _vVertex[i].x;
             S[1] = _vVertex[j].y - _vVertex[i].y;
             S[2] = _CurrentPos.y - _vVertex[i].y;
+
             double itsPosX = S[0] * S[2] / S[1] + _vVertex[i].x;
             if(_CurrentPos.x < itsPosX)
             {
@@ -829,35 +864,19 @@ bool isinner(POINT _CurrentPos, vector<POINT> _vVertex)
             }
         }
     }
+
     return (iCount % 2) != 0;
 }
-//************************************************************************************************************************//
 
+//************************************************************************************************************************//
 void my_handler(sig_atomic_t s)
 {
     printf("Caught signal %d\n",s);
     exit(1); 
 }
 
-void Error_Log_write(string log_data)
-{
-	time_t timer; 
-	struct tm* t; 
-	timer = time(NULL); 
-	t = localtime(&timer); 
-	string m_strFilePathName;
-	string m_colon = ":";
-	string m_time_stemp = to_string(t->tm_hour) + m_colon + to_string(t->tm_min) + m_colon + to_string(t->tm_sec);
-	string m_temp1 = m_time_stemp + "_error";		
-	m_strFilePathName = "/home/tetra/LOG/" + m_temp1 + ".txt";  
-	fp = fopen(m_strFilePathName.c_str(), "w");
-	if(fp == NULL) 
-		ROS_INFO("file is null");
-	fprintf(fp, "[Error]: %s \n", log_data.c_str());
-	fclose(fp);
-}
-
 /** reduce angle to between 0 and 360 degrees. */
+
 double reduceHeading(double a) 
 {
     return remainder(a-180, 360)+180;
@@ -870,13 +889,13 @@ void joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
 	{	
         //Docking Start//
 		ex_iDocking_CommandMode = 1;
-        _pFlag_Value.m_bflag_DockingExit = false;
+        _pFlag_Value.m_bfalg_DockingExit = false;
 	}
     if(joy->buttons[7]) //RT button
 	{	
 		//Docking Stop//
 		ex_iDocking_CommandMode = 0;
-        _pFlag_Value.m_bflag_DockingExit = true;
+        _pFlag_Value.m_bfalg_DockingExit = true;
 
 	}
 	
@@ -1000,7 +1019,6 @@ void PCL2_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
         _pFlag_Value.m_bFlag_Obstacle_PCL2 = false;
 }
 
-	
 void Cygbot_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
     int size = msg->ranges.size();
@@ -1009,6 +1027,7 @@ void Cygbot_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
     int cygbot_maxIndex = 160;
     int cygbot_closestIndex = -1;
     double cygbot_minVal = 0.5;
+
     for (int i = cygbot_minIndex; i < cygbot_maxIndex; i++)
     {
         if ((msg->ranges[i] <= cygbot_minVal) && (msg->ranges[i] >= msg->range_min) && (msg->ranges[i] <= msg->range_max))
@@ -1024,7 +1043,6 @@ void Cygbot_Callback(const sensor_msgs::LaserScan::ConstPtr &msg)
         _pFlag_Value.m_bFlag_Obstacle_cygbot = false;
     
 }
-
 
 double Quaternion2Yaw(double Quaternion_W, double Quaternion_X, double Quaternion_Y, double Quaternion_Z)
 {
@@ -1077,6 +1095,7 @@ double Quaternion2Yaw_rad(double Quaternion_W, double Quaternion_X, double Quate
     m_dYaw_rad = m_dYaw; 
     
     //m_dYaw_rad = reduceHeading(m_dYaw);
+    
     return m_dYaw_rad;
 }
 
@@ -1091,13 +1110,14 @@ string GetWIFI_IPAddress()
     fd = socket(AF_INET, SOCK_DGRAM, 0);
      
     ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name, "enp2s0", IFNAMSIZ -1); //Ehernet device name Check
+    strncpy(ifr.ifr_name, "enp3s0", IFNAMSIZ -1); //Ehernet device name Check
     
     ioctl(fd, SIOCGIFADDR, &ifr);
     close(fd);
      
     sprintf(myEth0_addr, "%s", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
     
+
     str_ip = myEth0_addr;
     return str_ip;
 }
@@ -1129,7 +1149,7 @@ void Docking_EXIT()
 
 bool DockingStop_Command(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res)
 {
-    Docking_EXIT(); // add by mwcha 230707
+    Docking_EXIT();
 	return true;
 }
 
@@ -1138,13 +1158,13 @@ bool SlopTime_Command(tetraDS_service::accelerationslop::Request &req,
 {
 	bool bResult = false;
 
-	AccelerationControl(req.slop_time);
+    AccelerationControl(req.slop_time);
 	/*
 	int32 slop_time
-	---
-	bool command_Result
+    ---
+    bool command_Result
 	*/
-	bResult = true;
+    bResult = true;
 	res.command_Result = bResult;
 	return true;
 }
@@ -1154,13 +1174,13 @@ bool Servo_Command(tetraDS_service::servo::Request &req,
 {
 	bool bResult = false;
 
-	servo_request.data = req.data; 
-	servo_pub.publish(servo_request);
-	bResult = true;
+    servo_request.data = req.data; 
+    servo_pub.publish(servo_request);
+    bResult = true;
 	/*
 	int32 data
-	---
-	bool command_Result
+    ---
+    bool command_Result
 	*/
 	res.command_Result = bResult;
 	return true;
@@ -1209,8 +1229,11 @@ void Dynamic_reconfigure_Costmap_Set_IntParam(string strname, int iValue)
         int_param.name = strname;
         int_param.value = iValue;
         reconf2.ints.push_back(int_param);
+
         srv_req.config = reconf2;
+
         ros::service::call("move_base/local_costmap/set_parameters", srv_req, srv_resp);
+        
     }
 
     DRI_old_strname = strname;
@@ -1232,15 +1255,20 @@ void Dynamic_reconfigure_Costmap_Set_BoolParam(string strname, bool bValue)
         bool_param.name = strname;
         bool_param.value = bValue;
         reconf3.bools.push_back(bool_param);
+
         srv_req.config = reconf3;
+
         ros::service::call("move_base/global_costmap/virtual_layer", srv_req, srv_resp);
         ros::service::call("move_base/local_costmap/virtual_layer", srv_req, srv_resp);
+
+        
     }
 
     DRB_old_strname = strname;
     DRB_old_bValue = bValue;
 
 }
+
 void LED_Turn_On(int id)
 {
     turnon_srv.request.ID = id;
@@ -1270,17 +1298,16 @@ bool Setspeed_Command(tetraDS_service::setmaxspeed::Request &req,
 	bool bResult = false;
 
     Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_x", (double)req.speed);
-    _pDynamic_param.MAX_Linear_velocity_origin = _pDynamic_param.MAX_Linear_velocity = (double)req.speed; // add by mwcha 230707
+    _pDynamic_param.MAX_Linear_velocity_origin = _pDynamic_param.MAX_Linear_velocity = (double)req.speed;
 
 	/*
 	float32 speed
-	---
-	float32 set_vel
-	bool command_Result
+    ---
+    float32 set_vel
+    bool command_Result
 	*/
-
-	res.set_vel = req.speed;
-	bResult = true;
+    res.set_vel = req.speed;
+    bResult = true;
 	res.command_Result = bResult;
 	return true;
 }
@@ -1289,14 +1316,14 @@ void cmd_vel_Callback(const geometry_msgs::Twist::ConstPtr& msg)
 {
     _pDynamic_param.m_linear_vel  = msg->linear.x;
     _pDynamic_param.m_angular_vel = msg->angular.z;
-	
+
     if(_pDynamic_param.m_linear_vel < 0)
     {
         if(!m_bToggle_enabled_flag1)
         {
             toggle_enabled.request.data = true;
             toggle_enabled_client.call(toggle_enabled);
-            //printf("toggle_Enable !\n");
+            printf("toggle_Enable !\n");
             m_bToggle_enabled_flag1 = true;
             m_bToggle_enabled_flag2 = false;
         }
@@ -1308,7 +1335,7 @@ void cmd_vel_Callback(const geometry_msgs::Twist::ConstPtr& msg)
         {
             toggle_enabled.request.data = false;
             toggle_enabled_client.call(toggle_enabled);
-            //printf("toggle_Disable !\n");
+            printf("toggle_Disable !\n");
             m_bToggle_enabled_flag1 = false;
             m_bToggle_enabled_flag2 = true;
         }
@@ -1318,7 +1345,9 @@ void cmd_vel_Callback(const geometry_msgs::Twist::ConstPtr& msg)
 
 void Particle_Callback(const geometry_msgs::PoseArray::ConstPtr& msg)
 {
+
     m_iParticleCloud_size = msg->poses.size();
+    //if(m_iParticleCloud_size > 501 && _pDynamic_param.m_linear_vel == 0.0 && _pDynamic_param.m_angular_vel == 0.0 && _pRobot_Status.m_iCallback_Charging_status != 1)
     if(m_iParticleCloud_size > 501 && _pDynamic_param.m_linear_vel == 0.0 && _pDynamic_param.m_angular_vel == 0.0 && _pFlag_Value.m_bFlag_Initialpose)
     {
         if(_pFlag_Value.m_bFlag_nomotion)
@@ -1330,7 +1359,7 @@ void Particle_Callback(const geometry_msgs::PoseArray::ConstPtr& msg)
     else
     {
             m_bFlag_nomotion_call = false;
-	    _pFlag_Value.m_bFlag_Initialpose = false;
+            _pFlag_Value.m_bFlag_Initialpose = false;
     }
     
 }
@@ -1373,7 +1402,6 @@ void TebMarkers_Callback(const visualization_msgs::Marker::ConstPtr& msg)
 void Teblocalplan_Callback(const geometry_msgs::PoseArray::ConstPtr& msg)
 {
     double m_dDelta_Value = 0.0;
-
     int m_iPoseIndex = msg->poses.size();
     for(int i=0; i<m_iPoseIndex; i++)
     {
@@ -1389,13 +1417,14 @@ void Teblocalplan_Callback(const geometry_msgs::PoseArray::ConstPtr& msg)
     {
         m_dDelta_Value = -1.0 * m_dDelta_Value;
     }
+
     if(_pFlag_Value.m_bCorneringFlag)
     {
         if(m_dDelta_Value >= 3.5)
         {
             if(!m_flag_Dynamic_Teblocalplan_major_update)
             {
-                Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_theta", 0.3); //0.35 //0.5
+                Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_theta", 0.5); //0.35
                 m_flag_Dynamic_Teblocalplan_major_update = true;
                 m_flag_Dynamic_Teblocalplan_minor_update = false;
                 _pFlag_Value.m_bTebMarker_reconfigure_flag = true;
@@ -1425,7 +1454,7 @@ void Teblocalplan_Callback(const geometry_msgs::PoseArray::ConstPtr& msg)
 
 void setGoal(move_base_msgs::MoveBaseActionGoal& goal)
 {
-    ros::Time now = ros::Time::now();
+    ros::Time now = ros::Time::now(); //ros::Time(0);
 
     goal.header.frame_id="map";
     goal.header.stamp=now;
@@ -1554,72 +1583,130 @@ bool GetLocation_Command(tetraDS_service::getlocation::Request  &req,
 {
 	bool bResult = false;
 
-	//Get POSE
-	// res.poseAMCLx = _pAMCL_pose.poseAMCLx;
-	// res.poseAMCLy = _pAMCL_pose.poseAMCLy;
-	// res.poseAMCLqx = _pAMCL_pose.poseAMCLqx;
-	// res.poseAMCLqy = _pAMCL_pose.poseAMCLqy;
-	// res.poseAMCLqz = _pAMCL_pose.poseAMCLqz;
-	// res.poseAMCLqw = _pAMCL_pose.poseAMCLqw;
+    //Get POSE
+    // res.poseAMCLx = _pAMCL_pose.poseAMCLx;
+    // res.poseAMCLy = _pAMCL_pose.poseAMCLy;
+    // res.poseAMCLqx = _pAMCL_pose.poseAMCLqx;
+    // res.poseAMCLqy = _pAMCL_pose.poseAMCLqy;
+    // res.poseAMCLqz = _pAMCL_pose.poseAMCLqz;
+    // res.poseAMCLqw = _pAMCL_pose.poseAMCLqw;
 
-	res.poseAMCLx = _pTF_pose.poseTFx;
-	res.poseAMCLy = _pTF_pose.poseTFy;
-	res.poseAMCLqx = _pTF_pose.poseTFqx;
-	res.poseAMCLqy = _pTF_pose.poseTFqy;
-	res.poseAMCLqz = _pTF_pose.poseTFqz;
-	res.poseAMCLqw = _pTF_pose.poseTFqw;
+    res.poseAMCLx = _pTF_pose.poseTFx;
+    res.poseAMCLy = _pTF_pose.poseTFy;
+    res.poseAMCLqx = _pTF_pose.poseTFqx;
+    res.poseAMCLqy = _pTF_pose.poseTFqy;
+    res.poseAMCLqz = _pTF_pose.poseTFqz;
+    res.poseAMCLqw = _pTF_pose.poseTFqw;
 	/*
-	---
-	bool   command_Result
-	float  poseAMCLx
-	float  poseAMCLy
-	float  poseAMCLqx
-	float  poseAMCLqy
-	float  poseAMCLqz
-	float  poseAMCLqw
+    ---
+    bool   command_Result
+    float  poseAMCLx
+    float  poseAMCLy
+    float  poseAMCLqx
+    float  poseAMCLqy
+    float  poseAMCLqz
+    float  poseAMCLqw
 	*/
-	bResult = res.command_Result = true; //res.command_Result = bResult;
+	bResult = res.command_Result = true;
 	return true;
 }
 
-bool Depart_Station2Move()
+// bool Depart_Station2Move()
+// {
+//     bool bResult = false;
+//     printf("Depart_station2Move ... docking exit!! \n"); //240315 mwcha
+//     //todo...
+//     if()
+//     {
+
+//     }
+//     geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+//     if(_pAR_tag_pose.m_transform_pose_x <= 0.6) //600mm depart move
+//     {
+//         if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+//         {
+//             cmd->linear.x =  0.0; 
+//             cmd->angular.z = 0.0;
+//             cmdpub_.publish(cmd);
+//             bResult = false;
+//         }
+//         else
+//         {
+//             cmd->linear.x =  -0.05; 
+//             cmd->angular.z = 0.0;
+//             cmdpub_.publish(cmd);
+//             bResult = false;
+//         }    
+//     }
+//     else
+//     {
+//         cmd->linear.x =  0.0; 
+//         cmd->angular.z = 0.0;
+//         cmdpub_.publish(cmd);
+
+//         //add goto cmd call//
+//         setGoal(goal);
+
+//         ex_iDocking_CommandMode = 0;
+
+//         bResult = true;
+//     }
+
+//     return bResult;
+// }
+
+bool Depart_Station2Move(int marker_id)
 {
     bool bResult = false;
+    printf("Depart_station2Move ... docking exit!! \n"); //240315 mwcha made new func
+
+    float m_fdistance = 0.0;
     geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
-    
-    if(_pAR_tag_pose.m_transform_pose_x <= 0.7) //700mm depart move
+    if(_pAR_tag_pose.m_iAR_tag_id == marker_id)
     {
-         if(_pFlag_Value.m_bFlag_Obstacle_cygbot) // if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+        m_fdistance = sqrt(_pAR_tag_pose.m_transform_pose_x * _pAR_tag_pose.m_transform_pose_x + _pAR_tag_pose.m_transform_pose_y * _pAR_tag_pose.m_transform_pose_y);
+        printf("Depart_fdistance: %.5f \n", m_fdistance);
+        if(m_fdistance < 0.3 && _pRobot_Status.m_iCallback_Charging_status < 2)
         {
-            cmd->linear.x =  0.0; 
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            bResult = false;
+            printf("Cant move because robot has docked but docking_station doesn`t work !! \n");
+            cmd->linear.x = 0.0;           
         }
         else
         {
-            cmd->linear.x =  -0.05; //0.05 ... 230707 mwcha
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            bResult = false;
+            if(_pAR_tag_pose.m_transform_pose_x <= 0.6) //600mm depart move
+            {
+                if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+                {
+                    cmd->linear.x =  0.0; 
+                    cmd->angular.z = 0.0;
+                    cmdpub_.publish(cmd);
+                    bResult = false;
+                }
+                else
+                {
+                    cmd->linear.x =  -0.05; 
+                    cmd->angular.z = 0.0;
+                    cmdpub_.publish(cmd);
+                    bResult = false;
+                }    
+            }
+            else
+            {
+                cmd->linear.x =  0.0; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+
+                //add goto cmd call//
+                setGoal(goal);
+
+                ex_iDocking_CommandMode = 0;
+
+                bResult = true;
+            }
         }
-            
     }
-    else
-    {
-        cmd->linear.x =  0.0; 
-        cmd->angular.z = 0.0;
-        cmdpub_.publish(cmd);
 
-        //add goto cmd call//
-        setGoal(goal);
-        
-        ex_iDocking_CommandMode = 0;
-
-        bResult = true;
-        
-    }
-    
+    cmdpub_.publish(cmd);
     return bResult;
 }
 
@@ -1627,44 +1714,45 @@ bool Goto_Command(tetraDS_service::gotolocation::Request &req,
 				  tetraDS_service::gotolocation::Response &res)
 {
 	bool bResult = false;
-	m_flag_setgoal = true;
 
-	//costmap clear call//
+    m_flag_setgoal = true;
+
+    //costmap clear call//
 	m_flag_clesr_costmap_call = clear_costmap_client.call(m_request);
 	while(!m_flag_clesr_costmap_call)
 	{
 		sleep(1);
 	}
-    	m_flag_clesr_costmap_call = false;
+	m_flag_clesr_costmap_call = false;
 
-	LED_Toggle_Control(1,3,100,3,1);
-	if(_pFlag_Value.m_bflag_patrol)
-		LED_Turn_On(100); //blue led
-	else
-		LED_Turn_On(63); //White led
+    LED_Toggle_Control(1,3,100,3,1);
+    if(_pFlag_Value.m_bflag_patrol)
+        LED_Turn_On(100); //blue led
+    else
+        LED_Turn_On(63); //White led
 
-	bResult = OpenLocationFile(req.Location);
-	printf("Goto bResult: %d \n", bResult);
-	res.goal_positionX = _pGoal_pose.goal_positionX;
-	res.goal_positionY = _pGoal_pose.goal_positionY;
-	res.goal_quarterX  = _pGoal_pose.goal_quarterX;
-	res.goal_quarterY  = _pGoal_pose.goal_quarterY;
-	res.goal_quarterZ  = _pGoal_pose.goal_quarterZ;
-	res.goal_quarterW  = _pGoal_pose.goal_quarterW;
-	goto_goal_id.id = req.Location;
 
-	ROS_INFO("goto_id.id: %s", goto_goal_id.id.c_str());
+    bResult = OpenLocationFile(req.Location);
+    printf("Goto bResult: %d \n", bResult);
+    res.goal_positionX = _pGoal_pose.goal_positionX;
+    res.goal_positionY = _pGoal_pose.goal_positionY;
+    res.goal_quarterX  = _pGoal_pose.goal_quarterX;
+    res.goal_quarterY  = _pGoal_pose.goal_quarterY;
+    res.goal_quarterZ  = _pGoal_pose.goal_quarterZ;
+    res.goal_quarterW  = _pGoal_pose.goal_quarterW;
+    goto_goal_id.id = req.Location;
 
-    if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x >= 0.4)) //Nomal
+    ROS_INFO("goto_id.id: %s", goto_goal_id.id.c_str());
+
+    if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x <= 0.4)) //Nomal
     {
         ROS_INFO("Goto Nomal Loop !");
-
         setGoal(goal);
         bResult = true;
         
     }
     
-    else //Docking...
+    else //docking
     {
         ex_iDocking_CommandMode = 10; //Depart Move
         bResult = true;
@@ -1677,24 +1765,24 @@ bool Goto_Command(tetraDS_service::gotolocation::Request &req,
 
 	/*
 	string Location
-	int32 mark_id
-	int32 movement
-	---
-	float64 goal_positionX
-	float64 goal_positionY
-	float64 goal_quarterX
-	float64 goal_quarterY
-	float64 goal_quarterZ
-	float64 goal_quarterW
-	bool command_Result
+    int32 mark_id
+    int32 movement
+    ---
+    float64 goal_positionX
+    float64 goal_positionY
+    float64 goal_quarterX
+    float64 goal_quarterY
+    float64 goal_quarterZ
+    float64 goal_quarterW
+    bool command_Result
 	*/
-	res.command_Result = true;
+	res.command_Result = bResult;
 
-	//reset flag...
-	_pFlag_Value.m_bFlag_Disable_bumper = false;
-	_pFlag_Value.m_bFlag_Initialpose = false;
-	
-	m_flag_setgoal = false;
+    //reset flag...
+    _pFlag_Value.m_bFlag_Disable_bumper = false;
+    _pFlag_Value.m_bFlag_Initialpose = false;
+
+    m_flag_setgoal = false;
 
 	return true;
 }
@@ -1703,10 +1791,10 @@ bool Goto_Command2(tetraDS_service::gotolocation2::Request &req,
 				   tetraDS_service::gotolocation2::Response &res)
 {
 	bool bResult = false;
-	
-	m_flag_setgoal = true;
 
-	//costmap clear call//
+    m_flag_setgoal = true;
+
+    //costmap clear call//
 	m_flag_clesr_costmap_call = clear_costmap_client.call(m_request);
 	while(!m_flag_clesr_costmap_call)
 	{
@@ -1714,44 +1802,46 @@ bool Goto_Command2(tetraDS_service::gotolocation2::Request &req,
 	}
 	m_flag_clesr_costmap_call = false;
 
-	_pGoal_pose.goal_positionX = req.goal_positionX;
-	_pGoal_pose.goal_positionY = req.goal_positionY;
-	_pGoal_pose.goal_quarterX = req.goal_quarterX;
-	_pGoal_pose.goal_quarterY = req.goal_quarterY;
-	_pGoal_pose.goal_quarterZ = req.goal_quarterZ;
-	_pGoal_pose.goal_quarterW = req.goal_quarterW;
-	//goto_goal_id.id = "1";
+    _pGoal_pose.goal_positionX = req.goal_positionX;
+    _pGoal_pose.goal_positionY = req.goal_positionY;
+    _pGoal_pose.goal_quarterX = req.goal_quarterX;
+    _pGoal_pose.goal_quarterY = req.goal_quarterY;
+    _pGoal_pose.goal_quarterZ = req.goal_quarterZ;
+    _pGoal_pose.goal_quarterW = req.goal_quarterW;
+    //goto_goal_id.id = "1";
+    //ros::Time(0);
+    printf("Goto_Command2 !! \n");
 
-	LED_Toggle_Control(1, 3,100,3,1);
-	LED_Turn_On(63);
+    LED_Toggle_Control(1, 3,100,3,1);
+    LED_Turn_On(63);
 
-	if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x >= 0.4)) //Nomal
-	{
-		setGoal(goal);
-		bResult = true;
-	}
-	else //Docking...
-	{
-		ex_iDocking_CommandMode = 10; //Depart Move
-		bResult = true;//false;
-	}
+    if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x <= 0.4)) //Nomal
+    {
+        setGoal(goal);
+        bResult = true;
+    }
+    else //Docking...
+    {
+        ex_iDocking_CommandMode = 10; //Depart Move
+        bResult = true;//false;
+    }
 	/*
-	float goal_positionX
-	float goal_positionY
-	float goal_quarterX
-	float goal_quarterY
-	float goal_quarterZ
-	float goal_quarterW
-	---
-	bool command_Result
+    float goal_positionX
+    float goal_positionY
+    float goal_quarterX
+    float goal_quarterY
+    float goal_quarterZ
+    float goal_quarterW
+    ---
+    bool command_Result
 	*/
-	res.command_Result = true;
-    	//reset flag...
-    	_pFlag_Value.m_bFlag_Disable_bumper = false;
-	_pFlag_Value.m_bFlag_Initialpose = false;
-	
-	m_flag_setgoal = false;
-	
+	res.command_Result = bResult;
+    //reset flag...
+    _pFlag_Value.m_bFlag_Disable_bumper = false;
+    _pFlag_Value.m_bFlag_Initialpose = false;
+
+    m_flag_setgoal = false;
+
 	return true;
 }
 
@@ -1759,23 +1849,23 @@ bool GotoCancel_Command(tetraDS_service::gotocancel::Request &req,
 				        tetraDS_service::gotocancel::Response &res)
 {
 	bool bResult = false;
-	
-	m_flag_setgoal = true;
 
-	goto_goal_id.id = "";
-	ROS_INFO("Goto Cancel call");
-	GotoCancel_pub.publish(goto_goal_id);
+    m_flag_setgoal = true;
+
+    goto_goal_id.id = "";
+    ROS_INFO("Goto Cancel call");
+    GotoCancel_pub.publish(goto_goal_id);
 	/*
 	string Location_id
-	---
-	bool command_Result
+    ---
+    bool command_Result
 	*/
-	bResult = true;
+    bResult = true;
 	res.command_Result = bResult;
-	ex_iDocking_CommandMode = 0;
-	
-	m_flag_setgoal = false;
-    	_pFlag_Value.m_bFlag_pub = false;
+    ex_iDocking_CommandMode = 0;
+
+    m_flag_setgoal = false;
+    _pFlag_Value.m_bFlag_pub = false;
 	return true;
 }
 
@@ -1816,16 +1906,16 @@ bool SetLocation_Command(tetraDS_service::setlocation::Request  &req,
         res.goal_quarterW  = _pTF_pose.poseTFqw;
     }
 
-	/*
+    /*
 	string Location
-	---
-	float goal_positionX
-	float goal_positionY
-	float goal_quarterX
-	float goal_quarterY
-	float goal_quarterZ
-	float goal_quarterW
-	bool command_Result
+    ---
+    float goal_positionX
+    float goal_positionY
+    float goal_quarterX
+    float goal_quarterY
+    float goal_quarterZ
+    float goal_quarterW
+    bool command_Result
 	*/
 	bResult = res.command_Result;
 
@@ -1849,25 +1939,25 @@ bool SetSavemap_Command(tetraDS_service::setsavemap::Request &req,
 					    tetraDS_service::setsavemap::Response &res)
 {
 	bool bResult = false;
+    
+    ROS_INFO("Save Map Call _ %s", req.map_name.c_str());
 
-	ROS_INFO("Save Map Call _ %s", req.map_name.c_str());
+    //call rosrun command//
+    string str_command = "gnome-terminal -- /home/tetra/mapsave.sh ";
+    string str_command2 = str_command + req.map_name.c_str();
 
-	//call rosrun command//
-	string str_command = "gnome-terminal -- /home/tetra/mapsave.sh ";
-	string str_command2 = str_command + req.map_name.c_str();
+    std::vector<char> writable1(str_command2.begin(), str_command2.end());
+    writable1.push_back('\0');
+    char* ptr1 = &writable1[0];
 
-	std::vector<char> writable1(str_command2.begin(), str_command2.end());
-	writable1.push_back('\0');
-	char* ptr1 = &writable1[0];
-
-	int iResult = std::system(ptr1);
-	/*
-	string map_name
-	---
-	bool command_Result
-	*/
-	bResult = res.command_Result;
-	//bResult = true;
+    int iResult = std::system(ptr1);
+    /*
+    string map_name
+    ---
+    bool command_Result
+    */
+	bResult = res.command_Result = true;
+    //bResult = true;
 	return true;
 }
 
@@ -1875,26 +1965,26 @@ bool GetInformation_Command(tetraDS_service::getinformation::Request  &req,
 					        tetraDS_service::getinformation::Response &res)
 {
 	bool bResult = false;
-	res.command_Result = false;
+    res.command_Result = false;
 
-	//Get Data
-	res.battery = _pRobot_Status.m_iCallback_Battery;
-	res.Error_Code = _pRobot_Status.m_iCallback_ErrorCode;
-	res.EMG = _pRobot_Status.m_iCallback_EMG;
-	res.bumper = _pRobot_Status.m_iCallback_Bumper;
-	res.charging = _pRobot_Status.m_iCallback_Charging_status;
-	res.running_mode = ex_ilaunchMode; //0:nomal, 1:mapping, 2:navigation
-	/*
-	---
-	bool command_Result
-	int32 battery
-	int32 Error_Code
-	bool EMG
-	bool bumper
-	bool charging
-	*/
+    //Get Data
+    res.battery = _pRobot_Status.m_iCallback_Battery;
+    res.Error_Code = _pRobot_Status.m_iCallback_ErrorCode;
+    res.EMG = _pRobot_Status.m_iCallback_EMG;
+    res.bumper = _pRobot_Status.m_iCallback_Bumper;
+    res.charging = _pRobot_Status.m_iCallback_Charging_status;
+    res.running_mode = ex_ilaunchMode; //0:nomal, 1:mapping, 2:navigation
+    /*
+    ---
+    bool command_Result
+    int32 battery
+    int32 Error_Code
+    bool EMG
+    bool bumper
+    bool charging
+    */
 
-	bResult = res.command_Result;
+	bResult = res.command_Result = true;
 	return true;
 }
 
@@ -1902,18 +1992,18 @@ bool Docking_Command(tetraDS_service::dockingcontrol::Request  &req,
 					 tetraDS_service::dockingcontrol::Response &res)
 {
 	bool bResult = false;
-	_pAR_tag_pose.m_iSelect_AR_tag_id = req.id;
-	//_pRobot_Status.HOME_ID = _pAR_tag_pose.m_iSelect_AR_tag_id = req.id;
-	ex_iDocking_CommandMode = req.mode;
+    _pAR_tag_pose.m_iSelect_AR_tag_id = req.id;
+    //_pRobot_Status.HOME_ID = _pAR_tag_pose.m_iSelect_AR_tag_id = req.id;
+    ex_iDocking_CommandMode = req.mode;
 
-	/*
-	int32 id
-	int32 mode
-	---
-	bool command_Result
-	*/
+    /*
+    int32 id
+    int32 mode
+    ---
+    bool command_Result
+    */
 
-	bResult = res.command_Result;
+	bResult = res.command_Result = true;
 	return true;
 }
 
@@ -2021,7 +2111,7 @@ bool LandmarkList_Command(tetraDS_service::getlandmarklist::Request  &req,
         res.command_Result = false;
     }
 
-    res.command_Result = bResult;
+    bResult = res.command_Result;
     return true;
 }
 
@@ -2078,7 +2168,7 @@ bool MapList_Command(tetraDS_service::getmaplist::Request &req,
     bool command_Result
     */
 
-    res.command_Result = bResult;
+    bResult = res.command_Result;
     return true;
 }
 
@@ -2105,7 +2195,7 @@ bool DeleteLocation_Command(tetraDS_service::deletelocation::Request  &req,
     bool command_Result
     */
 
-    res.command_Result = bResult;
+    bResult = res.command_Result;
     return true;
 }
 
@@ -2128,7 +2218,7 @@ bool DeleteLandmark_Command(tetraDS_service::deletelandmark::Request  &req,
     }
     
 
-    res.command_Result = bResult;
+    bResult = res.command_Result;
     return true;
 }
 
@@ -2172,14 +2262,16 @@ bool DeleteMap_Command(tetraDS_service::deletemap::Request &req,
     return true;
 }
 
+
+
 bool Virtual_Obstacle_Command(tetraDS_service::virtual_obstacle::Request &req, 
 				              tetraDS_service::virtual_obstacle::Response &res)
 {
 	bool bResult = false;
-	int m_iInt_count = 0;
-	int m_iNext_count = 0;
+    int m_iInt_count = 0;
+    int m_iNext_count = 0;
 
-	// msg clear
+    // msg clear
     virtual_obstacle.list.clear();
     //Global_costmap Loop//
     virtual_obstacle.list.resize(req.list_count.size());
@@ -2197,21 +2289,20 @@ bool Virtual_Obstacle_Command(tetraDS_service::virtual_obstacle::Request &req,
         m_iNext_count += m_iInt_count;
         
     }
-
-	if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
-	{
-		bResult = false;
+    
+    if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
+    {
+        bResult = false;
 		res.command_Result = bResult;
-		//printf("!!!! m_flag_Dynamic_reconfigure_call Timing !!!! \n");
 		return true;
+    
 	}
 	virtual_obstacle_pub.publish(virtual_obstacle);
-
-    // 231115 add
-    if(virtual_obstacle.list.size() != 0 )
-    {
-        m_bFlag_virtualWallCheck = true;
-    }
+        // 231115 add
+    	if(virtual_obstacle.list.size() != 0 )
+    	{
+            m_bFlag_virtualWallCheck = true;
+    	}
 	/*
 	int32[]  list_count
 	float64[] form_x
@@ -2219,8 +2310,8 @@ bool Virtual_Obstacle_Command(tetraDS_service::virtual_obstacle::Request &req,
 	float64[] form_z
 	---
 	bool command_Result
-	*/
-	bResult = true;
+    */
+    bResult = true;
 	res.command_Result = bResult;
 	return true;
 }
@@ -2230,10 +2321,12 @@ bool Patrol_Command(tetraDS_service::patrol::Request &req,
 {
 	bool bResult = false;
 
-	_pFlag_Value.m_bflag_auto_patrol = _pFlag_Value.m_bflag_patrol = req.on;
+
+    _pFlag_Value.m_bflag_auto_patrol = _pFlag_Value.m_bflag_patrol = req.on;
     m_patrol_location_cnt = req.list_count;
     printf("# m_bflag_patrol: %d  \n", _pFlag_Value.m_bflag_patrol);
     printf("# m_patrol_location_cnt: %d  \n", m_patrol_location_cnt);
+
     for(int i=0; i<m_patrol_location_cnt; i++)
     {
         arr_patrol_location[i] = req.location_name[i];
@@ -2241,43 +2334,41 @@ bool Patrol_Command(tetraDS_service::patrol::Request &req,
     }
    
 	/*
-	bool on
-	int32  list_count
-	string[] location_name
-	---
-	bool command_Result
+    bool on
+    int32  list_count
+    string[] location_name
+    ---
+    bool command_Result
 	*/
-	bResult = true;
+    bResult = true;
 	res.command_Result = bResult;
 	return true;
 }
 
-/*
-bool Patrol_Conveyor_Command(tetraDS_service::patrol_conveyor::Request &req, 
-				             tetraDS_service::patrol_conveyor::Response &res)
-{
-	bool bResult = false;
+// bool Patrol_Conveyor_Command(tetraDS_service::patrol_conveyor::Request &req, 
+// 				             tetraDS_service::patrol_conveyor::Response &res)
+// {
+// 	bool bResult = false;
 
-	_pFlag_Value.m_bflag_patrol2 = req.on;
-	m_iLoading_ID = req.loading_id;
-	m_iUnloading_ID = req.unloading_id;
-	m_strLoading_loacation_name = req.loading_location_name;
-	m_strUnloading_loacation_name = req.unloading_location_name;
+//     _pFlag_Value.m_bflag_patrol2 = req.on;
+//     m_iLoading_ID = req.loading_id;
+//     m_iUnloading_ID = req.unloading_id;
+//     m_strLoading_loacation_name = req.loading_location_name;
+//     m_strUnloading_loacation_name = req.unloading_location_name;
 
-	/*
-	bool on
-	int32  loading_id
-	int32  unloading_id
-	string loading_location_name
-	string unloading_location_name
-	---
-	bool command_Result
-	*/
-//	bResult = true;
-//	res.command_Result = bResult;
-//	return true;
-//}
-
+// 	/*
+//     bool on
+//     int32  loading_id
+//     int32  unloading_id
+//     string loading_location_name
+//     string unloading_location_name
+//     ---
+//     bool command_Result
+// 	*/
+//     bResult = true;
+// 	res.command_Result = bResult;
+// 	return true;
+// }
 
 void Reset_EKF_SetPose()
 {
@@ -2297,38 +2388,38 @@ void Reset_EKF_SetPose()
 	setpose_srv.request.pose.pose.covariance[0] = 0.25;
 	setpose_srv.request.pose.pose.covariance[6 * 1 + 1] = 0.25;
 	setpose_srv.request.pose.pose.covariance[6 * 5 + 5] = 0.06853892326654787;
-
+    
 	SetPose_cmd_client.call(setpose_srv); //Set_pose call//
-	printf("##Set_Pose(EKF)! \n");
+	//printf("##Set_Pose(EKF)! \n");
 
-	initPose_.header.stamp = ros::Time(0); //ros::Time::now(); 
-	initPose_.header.frame_id = "map";
-	//position
-	initPose_.pose.pose.position.x = 0.0;
-	initPose_.pose.pose.position.y = 0.0;
-	initPose_.pose.pose.position.z = 0.0;
-	//orientation
-	initPose_.pose.pose.orientation.x = 0.0;
-	initPose_.pose.pose.orientation.y = 0.0;
-	initPose_.pose.pose.orientation.z = 0.0;
-	initPose_.pose.pose.orientation.w = 1.0;
+    initPose_.header.stamp = ros::Time(0); //ros::Time::now(); 
+    initPose_.header.frame_id = "map";
+    //position
+    initPose_.pose.pose.position.x = 0.0;
+    initPose_.pose.pose.position.y = 0.0;
+    initPose_.pose.pose.position.z = 0.0;
+    //orientation
+    initPose_.pose.pose.orientation.x = 0.0;
+    initPose_.pose.pose.orientation.y = 0.0;
+    initPose_.pose.pose.orientation.z = 0.0;
+    initPose_.pose.pose.orientation.w = 1.0;
 
-	initPose_.pose.covariance[0] = 0.25;
-	initPose_.pose.covariance[6 * 1 + 1] = 0.25;
-	initPose_.pose.covariance[6 * 5 + 5] = 0.06853892326654787;
+    initPose_.pose.covariance[0] = 0.25;
+    initPose_.pose.covariance[6 * 1 + 1] = 0.25;
+    initPose_.pose.covariance[6 * 5 + 5] = 0.06853892326654787;
 
-	initialpose_pub.publish(initPose_);
-	printf("##Set_initPose(2D Estimate)! \n");
+    initialpose_pub.publish(initPose_);
+    //printf("##Set_initPose(2D Estimate)! \n");
 
-	usleep(500000);
+    usleep(500000);
 
-	_pFlag_Value.m_bFlag_nomotion = true;
+    //_pFlag_Value.m_bFlag_nomotion = true;
 }
 
 bool Marker_Reset_Robot_Pose()
 {
     _pFlag_Value.m_bFlag_nomotion = false;
-    
+
     bool bResult = false;
     string m_strFilePathName;
     string landmark_name = "marker_" + std::to_string(_pAR_tag_pose.m_iAR_tag_id);
@@ -2339,7 +2430,7 @@ bool Marker_Reset_Robot_Pose()
     }
     else 
     {
-        printf("#Docking Reset Marker_ID: %d \n", _pAR_tag_pose.m_iAR_tag_id);
+        //printf("#Docking Reset Marker_ID: %d \n", _pAR_tag_pose.m_iAR_tag_id);
         bResult = true;
     }
 
@@ -2352,6 +2443,7 @@ bool Marker_Reset_Robot_Pose()
         _pFlag_Value.m_bFlag_nomotion = true;
         return false;
     }
+
 
     if (fp != NULL) //File Open Check
     {
@@ -2398,7 +2490,7 @@ bool Marker_Reset_Robot_Pose()
 	    //orientation
 	    initPose_.pose.pose.orientation.x = 0.0;
 	    initPose_.pose.pose.orientation.y = 0.0;
-	    initPose_.pose.pose.orientation.z = -1.0 * _pLandMarkPose.init_orientation_z; //add by mwcha
+	    initPose_.pose.pose.orientation.z = -1.0 * _pLandMarkPose.init_orientation_z;
 	    initPose_.pose.pose.orientation.w = _pLandMarkPose.init_orientation_w;
 
 	    initPose_.pose.covariance[0] = 0.25;
@@ -2447,9 +2539,10 @@ void Reset_Robot_Pose()
     virtual_obstacle2_pub.publish(virtual_obstacle2);
 
     _pFlag_Value.m_bFlag_Initialpose = true;
-    
+
     LED_Toggle_Control(1, 3,100,3,1);
     LED_Turn_On(63);
+    
 }
 
 bool SetInitPose_Command(tetraDS_service::setinitpose::Request  &req, 
@@ -2537,7 +2630,6 @@ bool SetInitPose_Command(tetraDS_service::setinitpose::Request  &req,
     initialpose_pub.publish(initPose_);
     //costmap clear call//
     clear_costmap_client.call(m_request);
-    bResult = true;
     res.command_Result = bResult;
     _pFlag_Value.m_bFlag_nomotion = true;
 
@@ -2570,6 +2662,7 @@ bool Set2D_Pose_Estimate_Command(tetraDS_service::pose_estimate::Request  &req,
     initialpose_pub.publish(initPose_);
     //costmap clear call//
     clear_costmap_client.call(m_request);
+    bResult = true;
     res.command_Result = bResult;
     _pFlag_Value.m_bFlag_nomotion = true;
 /*
@@ -2695,6 +2788,7 @@ void Ultrasonic_DR_Callback(const sensor_msgs::Range::ConstPtr& msg)
     m_Ultrasonic_DR_Range = msg->range;
 }
 
+/*
 void Ultrasonic_RL_Callback(const sensor_msgs::Range::ConstPtr& msg)
 {
     m_Ultrasonic_RL_Range = msg->range;
@@ -2704,6 +2798,7 @@ void Ultrasonic_RR_Callback(const sensor_msgs::Range::ConstPtr& msg)
 {
     m_Ultrasonic_RR_Range = msg->range;
 }
+not used in sonar sensor after 2023 */
 
 //Conveyor function
 void LoadcellCallback(const std_msgs::Float64::ConstPtr& msg)
@@ -2715,7 +2810,11 @@ void SensorCallback(const std_msgs::Int32::ConstPtr& msg)
 {
     _pRobot_Status.m_iConveyor_Sensor_info = msg->data;
 }
-
+//add.. Total Distance Callback ... 240129 mwcha
+void TotalDistance_Callback(const std_msgs::Float32::ConstPtr& msg)
+{
+    _pRobot_Status.m_dTotal_Distance = msg->data;
+}
 /////////LanMark file Write & Read Fuction///////////
 bool SaveLandMark(LANDMARK_POSE p)
 {
@@ -2856,7 +2955,7 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     printf("[ERROR]resultCallback _ RED LED On \n");
     _pFlag_Value.m_bflag_NextStep = false;
     ROS_INFO("[ERROR]resultCallback: %d ",msgResult->status.status);
-	  
+
     m_flag_setgoal = true;
 
     goto_goal_id.id = "";
@@ -2871,15 +2970,15 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     }
     else
     {
-	//costmap clear call//
-    	clear_costmap_client.call(m_request);
-	    
+        //costmap clear call//
+        clear_costmap_client.call(m_request);
+
         LED_Toggle_Control(1, 3,100,3,1);
         if(_pFlag_Value.m_bflag_Conveyor_docking)
             LED_Turn_On(45); //sky_blue
         else
             LED_Turn_On(63);
-        
+
         ROS_INFO("[RETRY Behavior]: goto_ %s", goal.goal_id.id.c_str());
         setGoal(goal);
         m_iRetry_cnt++;
@@ -2888,16 +2987,15 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     m_flag_setgoal = false;
     m_flag_PREEMPTED = false;
 
-  }
 
+  }
   else if(msgResult->status.status == PREEMPTED) //bumper On Check...
   {
-    //goto_goal_id.id = "";
-    //ROS_INFO("Goto Cancel call");
-    //GotoCancel_pub.publish(goto_goal_id);
+    // if(_pFlag_Value.BUMPER_BT)
+    //     ex_iDocking_CommandMode = 100;
     m_flag_PREEMPTED = true;
+    
   }
-
   else
   {
     _pFlag_Value.m_bflag_NextStep = false;
@@ -2906,6 +3004,7 @@ void resultCallback(const move_base_msgs::MoveBaseActionResult::ConstPtr& msgRes
     //costmap clear call//
     //clear_costmap_client.call(m_request);
   }
+
 }
 
 // add Move_base Die Check
@@ -3055,7 +3154,7 @@ bool Approach_Station2Move()
         }
         else
         {
-            cmd->linear.x =  0.01; //-0.01; 
+            cmd->linear.x =  0.01; 
             cmd->angular.z = 0.0;
             cmdpub_.publish(cmd);
             m_iDocking_timeout_cnt++;
@@ -3093,7 +3192,7 @@ bool Approach_Station2Move2()
         }
         else
         {
-            cmd->linear.x =  0.01; //-0.01; 
+            cmd->linear.x =  0.01; 
             cmd->angular.z = 0.0;
             cmdpub_.publish(cmd);
             m_iDocking_timeout_cnt++;
@@ -3108,45 +3207,6 @@ bool Approach_Station2Move2()
         cmdpub_.publish(cmd);
         printf("Approach Loop STOP !! \n");
         ex_iDocking_CommandMode = 16;
-    }
-    
-
-    bResult = true;
-    return bResult;
-}
-bool Approach_Station2Move_H()
-{
-    bool bResult = false;
-    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
-
-    if(_pRobot_Status.m_iCallback_Charging_status <= 1)
-    {
-        if(m_iDocking_timeout_cnt > 3000)
-        {
-            cmd->linear.x =  0.0; 
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            m_iDocking_timeout_cnt = 0;
-            ex_iDocking_CommandMode = 9;
-
-        }
-        else
-        {
-            cmd->linear.x =  0.01; //-0.01; 
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            m_iDocking_timeout_cnt++;
-            
-        }
-
-    }
-    else
-    {
-        cmd->linear.x =  0.0; 
-        cmd->angular.z = 0.0;
-        cmdpub_.publish(cmd);
-        printf("Approach Loop STOP !! \n");
-        ex_iDocking_CommandMode = 26;
     }
     
 
@@ -3246,7 +3306,7 @@ bool ChargingStation_tracking(bool bOn, int marker_id)
         {
             m_fdistance = sqrt(_pAR_tag_pose.m_transform_pose_x * _pAR_tag_pose.m_transform_pose_x + _pAR_tag_pose.m_transform_pose_y * _pAR_tag_pose.m_transform_pose_y);
             //printf("master_distance: %.5f \n", m_fdistance);
-            if(m_fdistance > 0.8 && m_fdistance < 1.5) // if(m_fdistance > 0.41 && m_fdistance < 1.5) 231019
+            if(m_fdistance > 0.41 && m_fdistance < 1.5)
             {
                 cmd->linear.x = 1.0 * (m_fdistance /1.2) * 0.15; 
                 //printf("linear velocity: %.2f \n", cmd->linear.x);
@@ -3764,285 +3824,19 @@ bool ConveyorStation_tracking2(int marker_id)
     return bResult;
 }
 
-/****************************************************************/
-// H model Docking Function add by mwcha //
-
-bool H_Station_tracking(bool bOn, int marker_id)
-{
-    bool bResult = false;
-    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
-
-    if(bOn)
-    {
-        printf("Conveyor_ID: %d  \n", marker_id);
-        float m_fdistance = 0.0;
-        if(_pAR_tag_pose.m_iAR_tag_id == marker_id)
-        {
-            m_fdistance = sqrt(_pAR_tag_pose.m_transform_pose_x * _pAR_tag_pose.m_transform_pose_x + _pAR_tag_pose.m_transform_pose_y * _pAR_tag_pose.m_transform_pose_y);
-            //printf("master_distance: %.5f \n", m_fdistance);
-            if(m_fdistance > 0.41 && m_fdistance < 1.5)
-            {
-                cmd->linear.x = 1.0 * (m_fdistance /1.2) * 0.15; 
-                //printf("linear velocity: %.2f \n", cmd->linear.x);
-                if(cmd->linear.x > 1.0)
-                {
-                    //Linear Over speed exit loop...
-                    cmd->linear.x =  0.0; 
-                    cmd->angular.z = 0.0;
-                    printf("[Linear Over speed]: follower is closing \n");
-                    return false;
-                }
-                
-                cmd->angular.z = -1.0 * atan2(_pAR_tag_pose.m_transform_pose_y, _pAR_tag_pose.m_transform_pose_x) / 1.25;
-                //printf("angular velocity: %.2f \n", cmd->angular.z);
-                if((cmd->angular.z > 1.0) || (cmd->angular.z < -1.0))
-                {
-                    //Angular Over speed exit loop......
-                    cmd->linear.x =  0.0; 
-                    cmd->angular.z = 0.0;
-                    printf("[Angular Over speed]: follower is closing \n");
-                    return false;
-                }
-                
-                cmdpub_.publish(cmd);
-            }
-            else
-            {
-                cmd->linear.x =  0.0; 
-                //cmd->angular.z = 0.0;
-                cmdpub_.publish(cmd);
-                printf("H model Tracking STOP !! \n");
-                ex_iDocking_CommandMode = 13;
-                m_iNoMarker_cnt = 0;
-            }
-        }
-        else
-        {
-            printf("No Marker, Rotation Movement !! \n");
-            cmd->angular.z = Rotation_Movement(); //0.1;
-            cmdpub_.publish(cmd);
-            if(m_iNoMarker_cnt > 4000) //retry timeout!!
-            {
-                m_iNoMarker_cnt = 0;
-                cmd->linear.x =  0.0; 
-                cmd->angular.z = 0.0;
-                cmdpub_.publish(cmd);
-                printf("H Station scan Fail !! \n");
-                ex_iDocking_CommandMode = 9;
-
-            }
-            else
-            {
-                m_iNoMarker_cnt++;
-            }
-
-        }
-
-    }
-    else
-    {
-        cmd->linear.x =  0.0; 
-        cmd->angular.z = 0.0;
-        cmdpub_.publish(cmd);
-        printf("H model Docking Loop STOP!_not find Marker!! \n");
-        ex_iDocking_CommandMode = 0;
-    }
-    
-
-    bResult = true;
-    return bResult;
-}
-
-bool H_Station_Yaw_tracking()
-{ 
-    bool bResult = false;
-    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
-
-    int m_iback_cnt = 0;
-    float m_fdistance = 0.0;
-    m_fdistance = sqrt(_pAR_tag_pose.m_transform_pose_x * _pAR_tag_pose.m_transform_pose_x + _pAR_tag_pose.m_transform_pose_y * _pAR_tag_pose.m_transform_pose_y);
-
-    if(_pAR_tag_pose.m_target_yaw <= 0.0174533 && _pAR_tag_pose.m_target_yaw >= -0.0174533) //+- 1.0deg
-    {
-        ex_iDocking_CommandMode = 14;
-        bResult = true;
-        return bResult;
-    }
-
-    if(_pAR_tag_pose.m_target_yaw > 0)
-    {
-        printf("++dir \n");
-        cmd->angular.z = -1.0 * _pAR_tag_pose.m_target_yaw * 1.6;
-        cmdpub_.publish(cmd);
-        sleep(2);
-
-        if(m_fdistance > 1.0 || m_fdistance < -1.0)
-        {
-            printf("[Error] Marker too far away !! \n");
-            cmd->angular.z = 0.0;
-            cmd->linear.x = 0.0;
-            cmdpub_.publish(cmd);
-
-            ex_iDocking_CommandMode = 9;
-            bResult = false;
-            return bResult;
-        }
-
-        while(m_iback_cnt < 30)
-        {
-            if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
-            {
-                cmd->angular.z = 0.0;
-                cmd->linear.x = 0.0;
-                cmdpub_.publish(cmd);
-            }
-            else
-            {
-                cmd->angular.z = 0.0;
-                cmd->linear.x = -1.0 * m_fdistance * 0.2;
-                cmdpub_.publish(cmd);
-                m_iback_cnt++;
-            }
-            usleep(100000); //100ms
-            
-        }
-        cmd->angular.z = 0.0;
-        cmd->linear.x = 0.0;
-        cmdpub_.publish(cmd);
-        printf("++dir STOP \n");
-        m_iRotation_Mode = 2;
-        ex_iDocking_CommandMode = 12;
-    }
-    else
-    {
-        printf("--dir \n");
-        cmd->angular.z = -1.0 * _pAR_tag_pose.m_target_yaw * 1.6;
-        cmdpub_.publish(cmd);
-        sleep(2);
-
-        if(m_fdistance > 1.0 || m_fdistance < -1.0)
-        {
-            printf("[Error] Marker too far away !! \n");
-            cmd->angular.z = 0.0;
-            cmd->linear.x = 0.0;
-            cmdpub_.publish(cmd);
-
-            ex_iDocking_CommandMode = 9;
-            bResult = false;
-            return bResult;
-        }
-
-        while(m_iback_cnt < 30)
-        {
-            if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
-            {
-                cmd->angular.z = 0.0;
-                cmd->linear.x = 0.0;
-                cmdpub_.publish(cmd);
-            }
-            else
-            {
-                cmd->angular.z = 0.0;
-                cmd->linear.x = -1.0 * m_fdistance * 0.2;
-                cmdpub_.publish(cmd);
-                m_iback_cnt++;
-            }
-            usleep(100000); //100ms
-            
-        }
-        cmd->angular.z = 0.0;
-        cmd->linear.x = 0.0;
-        cmdpub_.publish(cmd);
-        printf("--dir STOP \n");
-        m_iRotation_Mode = 1;
-        ex_iDocking_CommandMode = 12;
-    }
-    
-
-    bResult = true;
-    return bResult;
-}
-
-bool H_Station_tracking2(int marker_id)
-{
-    bool bResult = false;
-    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
-    
-    float m_fdistance = 0.0;
-    if(_pAR_tag_pose.m_iAR_tag_id == marker_id)
-    {
-        m_fdistance = sqrt(_pAR_tag_pose.m_transform_pose_x * _pAR_tag_pose.m_transform_pose_x + _pAR_tag_pose.m_transform_pose_y * _pAR_tag_pose.m_transform_pose_y);
-        if(_pRobot_Status.m_iCallback_Charging_status < 2)
-        {
-            cmd->linear.x = 1.0 * (m_fdistance /1.2) * 0.1; //max speed 0.1m/s
-            //printf("linear velocity: %.2f \n", cmd->linear.x);
-            if(cmd->linear.x > 1.0)
-            {
-                //Linear Over speed exit loop......
-                cmd->linear.x =  0.0; 
-                cmd->angular.z = 0.0;
-                printf("[Linear Over speed]: follower is closing \n");
-                return false;
-            }
-            
-            cmd->angular.z = -1.0 * atan2(_pAR_tag_pose.m_transform_pose_y, _pAR_tag_pose.m_transform_pose_x) / 1.25;
-            //printf("angular velocity: %.2f \n", cmd->angular.z);
-            if((cmd->angular.z > 1.0) || (cmd->angular.z < -1.0))
-            {
-                //Angular Over speed exit loop......
-                cmd->linear.x =  0.0; 
-                cmd->angular.z = 0.0;
-                printf("[Angular Over speed]: follower is closing \n");
-                return false;
-            }
-            
-            cmdpub_.publish(cmd);
-        }
-        else
-        {
-            cmd->linear.x =  0.0; 
-            cmd->angular.z = 0.0;
-            cmdpub_.publish(cmd);
-            printf("H model Tracking STOP & Docking Finish !! \n");
-            ex_iDocking_CommandMode = 16;
-            m_iNoMarker_cnt = 0;
-        }
-    }
-    else
-    {
-        cmd->linear.x =  0.0; 
-        cmd->angular.z = 0.0;
-        cmdpub_.publish(cmd);
-        printf("No Marker 2! \n");
-        if(m_iNoMarker_cnt >= 10)
-        {
-            m_iNoMarker_cnt = 0;
-             ex_iDocking_CommandMode = 16;
-            printf("No Marker 2_Timeout! \n");
-        }
-        else
-        {
-            m_iNoMarker_cnt++;
-        }
-    }
-
-    bResult = true;
-    return bResult;
-} // mwcha
-
 bool mapping_Command(tetraDS_service::runmapping::Request &req, 
 					 tetraDS_service::runmapping::Response &res)
 {
 	bool bResult = false;
-	bResult = req.flag_mapping;
+    bResult = req.flag_mapping;
 
-	rosrun_mapping();
-	/*
-	bool flag_mapping
-	---
-	bool command_Result
-	*/
-	bResult = true;
+    rosrun_mapping();
+    /*
+    bool flag_mapping
+    ---
+    bool command_Result
+    */
+
 	res.command_Result = true;
 	return true;
 }
@@ -4052,15 +3846,14 @@ bool navigation_Command(tetraDS_service::runnavigation::Request &req,
 {
 	bool bResult = false;
 
-	string str_mapname = req.map_name.c_str();
-	rosrun_navigation(str_mapname);
-	/*
-	string map_name
-	---
-	bool command_Result
-	*/
+    string str_mapname = req.map_name.c_str();
+    rosrun_navigation(str_mapname);
+    /*
+    string map_name
+    ---
+    bool command_Result
+    */
 
-	bResult = true;
 	res.command_Result = true;
 	return true;
 }
@@ -4069,18 +3862,18 @@ bool nodekill_Command(tetraDS_service::rosnodekill::Request &req,
 					  tetraDS_service::rosnodekill::Response &res)
 {
 	bool bResult = false;
+    
+    //bResult = req.flag_kill;
 
-	//bResult = req.flag_kill;
+    bResult = rosnodekill_all();
+    printf("rosnodekill_all: %d \n", bResult);
+    // sleep(1);
 
-	bResult = rosnodekill_all();
-	printf("rosnodekill_all: %d \n", bResult);
-	// sleep(1);
-
-	/*
-	---
-	bool command_Result
-	*/
-	//throw std::runtime_error("####this will show up");
+    /*
+    ---
+    bool command_Result
+    */
+    //throw std::runtime_error("####this will show up");
 
 	res.command_Result = bResult;
 	return true;
@@ -4090,7 +3883,8 @@ bool Goto_Conveyor_Command(tetraDS_service::gotoconveyor::Request &req,
 				            tetraDS_service::gotoconveyor::Response &res)
 {
 	bool bResult = false;
-	//costmap clear call//
+
+    //costmap clear call//
 	m_flag_clesr_costmap_call = clear_costmap_client.call(m_request);
 	while(!m_flag_clesr_costmap_call)
 	{
@@ -4098,38 +3892,37 @@ bool Goto_Conveyor_Command(tetraDS_service::gotoconveyor::Request &req,
 	}
 	m_flag_clesr_costmap_call = false;
 
-	LED_Toggle_Control(1, 3,100,3,1);
-	LED_Turn_On(45); //sky_blue
+    LED_Toggle_Control(1, 3,100,3,1);
+    LED_Turn_On(45); //sky_blue
 
-	bResult = OpenLocationFile(req.Location);
-	//printf("Goto bResult: %d \n", bResult);
+    bResult = OpenLocationFile(req.Location);
+    //printf("Goto bResult: %d \n", bResult);
 
-	goto_goal_id.id = req.Location;
-	_pRobot_Status.CONVEYOR_ID = req.id;
-	_pRobot_Status.CONVEYOR_MOVEMENT = req.movement;
-	_pFlag_Value.m_bflag_Conveyor_docking = true;
+    goto_goal_id.id = req.Location;
+    _pRobot_Status.CONVEYOR_ID = req.id;
+    _pRobot_Status.CONVEYOR_MOVEMENT = req.movement;
+    _pFlag_Value.m_bflag_Conveyor_docking = true;
 
-	ROS_INFO("goto_conveyor_name: %s, id: %d, movement: %d", goto_goal_id.id.c_str(), _pRobot_Status.CONVEYOR_ID, _pRobot_Status.CONVEYOR_MOVEMENT);
+    ROS_INFO("goto_conveyor_name: %s, id: %d, movement: %d", goto_goal_id.id.c_str(), _pRobot_Status.CONVEYOR_ID, _pRobot_Status.CONVEYOR_MOVEMENT);
 
-	if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x <= 0.5))  //Nomal
-	{
-		LED_Toggle_Control(1, 3,100,3,1);
-		LED_Turn_On(45); //sky_blue
-		setGoal(goal);
-	}
-	else //Docking...
-	{
-		ex_iDocking_CommandMode = 10; //Depart Move
-	}
+    if(_pRobot_Status.m_iCallback_Charging_status <= 1 && (_pAR_tag_pose.m_iAR_tag_id == -1 || _pAR_tag_pose.m_transform_pose_x <= 0.5))  //Nomal
+    {
+        LED_Toggle_Control(1, 3,100,3,1);
+        LED_Turn_On(45); //sky_blue
+        setGoal(goal);
+    }
+    else //Docking...
+    {
+        ex_iDocking_CommandMode = 10; //Depart Move
+    }
 
 	/*
-	string Location
-	int32 id
-	int32 movement
-	---
-	bool command_Result
+    string Location
+    int32 id
+    int32 movement
+    ---
+    bool command_Result
 	*/
-	bResult = true;
 	res.command_Result = bResult;
 	return true;
 }
@@ -4137,18 +3930,18 @@ bool Goto_Conveyor_Command(tetraDS_service::gotoconveyor::Request &req,
 bool Loading_check_Command(tetraDS_service::loadingcheck::Request &req, tetraDS_service::loadingcheck::Response &res)
 {
 	bool bResult = false;
-	//to do Check Loop...
-	if(_pRobot_Status.m_iConveyor_Sensor_info == 0)
-	{
-		bResult = true;
-	}
-	else
-	{
-		bResult = false;
-	}
+    //to do Check Loop...
+    if(_pRobot_Status.m_iConveyor_Sensor_info == 0)
+    {
+        bResult = true;
+    }
+    else
+    {
+        bResult = false;
+    }
 	/*
-	---
-	int32 command_Result
+    ---
+    int32 command_Result
 	*/
 	res.command_Result = bResult;
 	return true;
@@ -4157,18 +3950,18 @@ bool Loading_check_Command(tetraDS_service::loadingcheck::Request &req, tetraDS_
 bool Unloading_check_Command(tetraDS_service::unloadingcheck::Request &req, tetraDS_service::unloadingcheck::Response &res)
 {
 	bool bResult = false;
-	//to do Check Loop...
-	if(_pRobot_Status.m_iConveyor_Sensor_info >= 2)
-	{
-		bResult = true;
-	}
-	else
-	{
-		bResult = false;
-	}
+    //to do Check Loop...
+    if(_pRobot_Status.m_iConveyor_Sensor_info >= 2)
+    {
+        bResult = true;
+    }
+    else
+    {
+        bResult = false;
+    }
 	/*
-	---
-	int32 command_Result
+    ---
+    int32 command_Result
 	*/
 	res.command_Result = bResult;
 	return true;
@@ -4311,6 +4104,65 @@ bool DeleteData_All_Command(tetraDS_service::deletedataall::Request  &req,
     return true;
 }
 
+void backmovement() // add 240129 mwcha
+{
+    geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+    printf("Target Distance = %.3f \n", _pRobot_Status.m_dGoal_Distance);
+    printf("SUM = %.3f \n", _pRobot_Status.m_dTotal_Distance +_pRobot_Status.m_backmove_cmd);
+    printf("_pRobot_Status.m_dTotal_Distance = %.3f \n", _pRobot_Status.m_dTotal_Distance);
+
+    if(_pRobot_Status.m_dTotal_Distance < _pRobot_Status.m_dGoal_Distance)
+    {
+        if(_pRobot_Status.m_cmd_vel < 0) // - move
+        {
+            if(_pFlag_Value.m_bFlag_Obstacle_cygbot)
+            {
+                cmd->linear.x =  0.0; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+            else
+            {
+                cmd->linear.x = _pRobot_Status.m_cmd_vel; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+        }
+        else // + move
+        {
+            if(_pFlag_Value.m_bFlag_Obstacle_Center)
+            {
+                cmd->linear.x =  0.0; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+            else
+            {
+                cmd->linear.x = _pRobot_Status.m_cmd_vel; 
+                cmd->angular.z = 0.0;
+                cmdpub_.publish(cmd);
+                        
+            }
+
+        }
+        printf("_pRobot_Status.m_cmd_vel; = %.3f \n", _pRobot_Status.m_cmd_vel);
+        cmd->linear.x = _pRobot_Status.m_cmd_vel; 
+        cmd->angular.z = 0.0;
+        cmdpub_.publish(cmd);  
+    }
+    else
+    {
+            cmd->linear.x =  0.0; 
+            cmd->angular.z = 0.0;
+            cmdpub_.publish(cmd);
+            ex_iDocking_CommandMode = 0;
+    }
+
+}
+
 void *DockingThread_function(void *data)
 {
     while(1)
@@ -4318,10 +4170,12 @@ void *DockingThread_function(void *data)
         switch(ex_iDocking_CommandMode)
         {
             case 0:
+                
                 break;
             /****************************************************************/
             // Station Docking Loop//
             case 1:
+            
                 LED_Toggle_Control(1, 3,100,3,100);
                 LED_Turn_On(63);
                 //usb_cam_On_client.call(m_request);
@@ -4332,7 +4186,7 @@ void *DockingThread_function(void *data)
                 break;
             case 2:
                 ChargingStation_tracking(true, _pRobot_Status.HOME_ID);
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4343,7 +4197,7 @@ void *DockingThread_function(void *data)
             case 3:
                 _pAR_tag_pose.m_target_yaw = _pAR_tag_pose.m_fAR_tag_pitch;
                 ChargingStation_Yaw_tracking();
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4353,7 +4207,7 @@ void *DockingThread_function(void *data)
                 break;
             case 4:
                 ChargingStation_tracking2(_pRobot_Status.HOME_ID);
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4364,7 +4218,7 @@ void *DockingThread_function(void *data)
             case 5:
                 //charging_port_On_client.call(m_request2);
                 Approach_Station2Move();
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4374,7 +4228,7 @@ void *DockingThread_function(void *data)
                 break;
             case 6:
                 LED_Turn_On(9);
-                //usb_cam_Off_client.call(m_request);
+                
                 ROS_INFO_STREAM("TETRA POSE Reset!");
                 m_iReset_flag = 1;
                 docking_progress.data = 6;
@@ -4385,19 +4239,16 @@ void *DockingThread_function(void *data)
                 LED_Turn_On(63);
 
                 ex_iDocking_CommandMode = 0;
-
                 break;
             case 9:
                 printf("Docking FAIL ! \n");
                 LED_Toggle_Control(1, 10,100,10,1);
                 LED_Turn_On(18);
-                //docking_progress.data = 10;
-                //docking_progress_pub.publish(docking_progress);
                 //ex_iDocking_CommandMode = 0;
                 ex_iDocking_CommandMode = 119;
                 break;
             case 10:
-                Depart_Station2Move();
+                Depart_Station2Move(_pAR_tag_pose.m_iSelect_AR_tag_id);
                 break;
             /****************************************************************/
             // Conveyor Docking Loop//
@@ -4412,7 +4263,7 @@ void *DockingThread_function(void *data)
                 break;
             case 12:
                 ConveyorStation_tracking(true, _pAR_tag_pose.m_iSelect_AR_tag_id);
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4423,7 +4274,7 @@ void *DockingThread_function(void *data)
             case 13:
                 _pAR_tag_pose.m_target_yaw = _pAR_tag_pose.m_fAR_tag_pitch;
                 ConveyorStation_Yaw_tracking();
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4433,7 +4284,7 @@ void *DockingThread_function(void *data)
                 break;
             case 14:
                 ConveyorStation_tracking2(_pAR_tag_pose.m_iSelect_AR_tag_id);
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4444,7 +4295,7 @@ void *DockingThread_function(void *data)
             case 15:
                 //charging_port_On_client.call(m_request2);
                 Approach_Station2Move2();
-                if(_pFlag_Value.m_bflag_DockingExit)
+                if(_pFlag_Value.m_bfalg_DockingExit)
                 {
                     Docking_EXIT();
                     ex_iDocking_CommandMode = 0;
@@ -4464,75 +4315,10 @@ void *DockingThread_function(void *data)
                 
                 LED_Toggle_Control(1, 5,100,5,1);
                 LED_Turn_On(63);
+
                 ex_iDocking_CommandMode = 0;
                 break;
             /****************************************************************/
-            // Conveyor Docking Loop//
-            case 21:
-                LED_Toggle_Control(1, 3,100,3,100);
-                LED_Turn_On(63);
-                //usb_cam_On_client.call(m_request);
-                sleep(2);
-                ex_iDocking_CommandMode = 22;
-                docking_progress.data = 1;
-                docking_progress_pub.publish(docking_progress);
-                break;
-            case 22:
-                H_Station_tracking(true, _pAR_tag_pose.m_iSelect_AR_tag_id);
-                if(_pFlag_Value.m_bflag_DockingExit)
-                {
-                    Docking_EXIT();
-                    ex_iDocking_CommandMode = 0;
-                }
-                docking_progress.data = 2;
-                docking_progress_pub.publish(docking_progress);
-                break;
-            case 23:
-                _pAR_tag_pose.m_target_yaw = _pAR_tag_pose.m_fAR_tag_pitch;
-                H_Station_Yaw_tracking();
-                if(_pFlag_Value.m_bflag_DockingExit)
-                {
-                    Docking_EXIT();
-                    ex_iDocking_CommandMode = 0;
-                }
-                docking_progress.data = 3;
-                docking_progress_pub.publish(docking_progress);
-                break;
-            case 24:
-                H_Station_tracking2(_pAR_tag_pose.m_iSelect_AR_tag_id);
-                if(_pFlag_Value.m_bflag_DockingExit)
-                {
-                    Docking_EXIT();
-                    ex_iDocking_CommandMode = 0;
-                }
-                docking_progress.data = 4;
-                docking_progress_pub.publish(docking_progress);
-                break;
-            case 25:
-                //charging_port_On_client.call(m_request2);
-                Approach_Station2Move_H();
-                if(_pFlag_Value.m_bflag_DockingExit)
-                {
-                    Docking_EXIT();
-                    ex_iDocking_CommandMode = 0;
-                }
-                docking_progress.data = 5;
-                docking_progress_pub.publish(docking_progress);
-                break;
-            case 26:
-                LED_Turn_On(9);
-                //usb_cam_Off_client.call(m_request);
-                //ROS_INFO_STREAM("TETRA POSE Rest!");
-                //m_iReset_flag = 1;
-                docking_progress.data = 6;
-                docking_progress_pub.publish(docking_progress);
-                //PoseReset_call
-                //Reset_Robot_Pose();
-                LED_Toggle_Control(1, 5,100,5,1);
-                LED_Turn_On(63);
-                ex_iDocking_CommandMode = 0;
-                break;
-            /****************************************************************/  
             case 30:
                 _pFlag_Value.m_bCorneringFlag = false;
                 ex_iDocking_CommandMode = 0;
@@ -4560,7 +4346,7 @@ void *DockingThread_function(void *data)
                 setGoal(goal);
                 _pFlag_Value.m_bflag_ComebackHome = true;
                 ex_iDocking_CommandMode = 0;
-                	
+
             case 200: //Auto Patrol Loop...
                 if(_pRobot_Status.m_iCallback_Battery == HIGH_BATTERY && _pFlag_Value.m_bflag_auto_patrol)
                 {
@@ -4568,7 +4354,6 @@ void *DockingThread_function(void *data)
                     ex_iDocking_CommandMode = 0;
                 }
                 break;
-
             default:
                 break;
         }
@@ -4629,7 +4414,6 @@ void *AutoThread_function(void *data)
 
             if(_pRobot_Status.m_iCallback_Battery <= LOW_BATTERY)
             {
-
                 goto_goal_id.id = "";
                 ROS_INFO("Goto Cancel call");
                 GotoCancel_pub.publish(goto_goal_id);
@@ -4648,162 +4432,162 @@ void *AutoThread_function(void *data)
                 ROS_INFO("[Battery Low]: come back Home~");
 
                 _pFlag_Value.m_bflag_patrol = false;
+                
             }
             
 
         }
-        /*
-        else if(_pFlag_Value.m_bflag_patrol2)
-        {
-            //Step 1. -> Goto Loading////////////////////////////////////////////////////////////
-            LED_Toggle_Control(1,3,100,3,1);
-            LED_Turn_On(100); //blue led
+        // else if(_pFlag_Value.m_bflag_patrol2)
+        // {
+        //     //Step 1. -> Goto Loading////////////////////////////////////////////////////////////
+        //     LED_Toggle_Control(1,3,100,3,1);
+        //     LED_Turn_On(100); //blue led
 
-            OpenLocationFile(m_strLoading_loacation_name);
-            goto_goal_id.id = m_strLoading_loacation_name;
-            _pRobot_Status.CONVEYOR_ID = m_iLoading_ID;
-            _pRobot_Status.CONVEYOR_MOVEMENT = 1;
-            _pFlag_Value.m_bflag_Conveyor_docking = true;
+        //     OpenLocationFile(m_strLoading_loacation_name);
+        //     goto_goal_id.id = m_strLoading_loacation_name;
+        //     _pRobot_Status.CONVEYOR_ID = m_iLoading_ID;
+        //     _pRobot_Status.CONVEYOR_MOVEMENT = 1;
+        //     _pFlag_Value.m_bflag_Conveyor_docking = true;
 
-            if(_pRobot_Status.m_iCallback_Charging_status <= 1) //Nomal
-            {
-                setGoal(goal);
-            }
-            else //Docking check...
-            {
-                ex_iDocking_CommandMode = 10; //Depart Move
-            }
+        //     if(_pRobot_Status.m_iCallback_Charging_status <= 1) //Nomal
+        //     {
+        //         setGoal(goal);
+        //     }
+        //     else //Docking check...
+        //     {
+        //         ex_iDocking_CommandMode = 10; //Depart Move
+        //     }
 
-            ROS_INFO("[patrol]: goto_conveyor-> Loading...");
-            while(_pRobot_Status.m_iMovebase_Result != 3)
-            {
-                if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
-                {
-                    goto_goal_id.id = "";
-                    ROS_INFO("Goto Cancel call");
-                    GotoCancel_pub.publish(goto_goal_id);
-                    _pFlag_Value.m_bflag_goto_cancel = true;
-                }
-                else
-                    usleep(1000000); //100ms
-            }
-            _pRobot_Status.m_iMovebase_Result = 0;
-            _pFlag_Value.m_bflag_goto_cancel = false;
+        //     ROS_INFO("[patrol]: goto_conveyor-> Loading...");
+        //     while(_pRobot_Status.m_iMovebase_Result != 3)
+        //     {
+        //         if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
+        //         {
+        //             goto_goal_id.id = "";
+        //             ROS_INFO("Goto Cancel call");
+        //             GotoCancel_pub.publish(goto_goal_id);
+        //             _pFlag_Value.m_bflag_goto_cancel = true;
+        //         }
+        //         else
+        //             usleep(1000000); //100ms
+        //     }
+        //     _pRobot_Status.m_iMovebase_Result = 0;
+        //     _pFlag_Value.m_bflag_goto_cancel = false;
 
-            while(_pRobot_Status.m_iCallback_Charging_status != 11)
-            {
-                if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
-                {
-                    goto_goal_id.id = "";
-                    ROS_INFO("Goto Cancel call");
-                    GotoCancel_pub.publish(goto_goal_id);
-                    _pFlag_Value.m_bflag_goto_cancel = true;
-                }
-                else
-                    sleep(1); //1 sec
-            }
-            //Conveyor Movement...
-            conveyor_srv.request.start = 1;
-            Conveyor_cmd_client.call(conveyor_srv);
-            ROS_INFO("CN1 CAll...");
-            sleep(1);
+        //     while(_pRobot_Status.m_iCallback_Charging_status != 11)
+        //     {
+        //         if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
+        //         {
+        //             goto_goal_id.id = "";
+        //             ROS_INFO("Goto Cancel call");
+        //             GotoCancel_pub.publish(goto_goal_id);
+        //             _pFlag_Value.m_bflag_goto_cancel = true;
+        //         }
+        //         else
+        //             sleep(1); //1 sec
+        //     }
+        //     //Conveyor Movement...
+        //     conveyor_srv.request.start = 1;
+        //     Conveyor_cmd_client.call(conveyor_srv);
+        //     ROS_INFO("CN1 CAll...");
+        //     sleep(1);
 
-            printf("_pRobot_Status.m_iConveyor_Sensor_info : %d \n", _pRobot_Status.m_iConveyor_Sensor_info );
-            //Loading Finish Check
-            while(_pRobot_Status.m_iConveyor_Sensor_info > 1)
-            {
-                ROS_INFO("Loading Loop Finish Wait...");
-                printf("_pRobot_Status.m_iConveyor_Sensor_info : %d \n", _pRobot_Status.m_iConveyor_Sensor_info );
-                sleep(1); //1 sec
-            }
+        //     printf("_pRobot_Status.m_iConveyor_Sensor_info : %d \n", _pRobot_Status.m_iConveyor_Sensor_info );
+        //     //Loading Finish Check
+        //     while(_pRobot_Status.m_iConveyor_Sensor_info > 1)
+        //     {
+        //         ROS_INFO("Loading Loop Finish Wait...");
+        //         printf("_pRobot_Status.m_iConveyor_Sensor_info : %d \n", _pRobot_Status.m_iConveyor_Sensor_info );
+        //         sleep(1); //1 sec
+        //     }
 
-            sleep(5);
+        //     sleep(5);
 
 
-            //Step 2. -> Goto Unloading ////////////////////////////////////////////////////////////
-            LED_Toggle_Control(1,3,100,3,1);
-            LED_Turn_On(100); //blue led
+        //     //Step 2. -> Goto Unloading ////////////////////////////////////////////////////////////
+        //     LED_Toggle_Control(1,3,100,3,1);
+        //     LED_Turn_On(100); //blue led
 
-            OpenLocationFile(m_strUnloading_loacation_name);
-            goto_goal_id.id = m_strUnloading_loacation_name;
-            _pRobot_Status.CONVEYOR_ID = m_iUnloading_ID;
-            _pRobot_Status.CONVEYOR_MOVEMENT = 2;
-            _pFlag_Value.m_bflag_Conveyor_docking = true;
+        //     OpenLocationFile(m_strUnloading_loacation_name);
+        //     goto_goal_id.id = m_strUnloading_loacation_name;
+        //     _pRobot_Status.CONVEYOR_ID = m_iUnloading_ID;
+        //     _pRobot_Status.CONVEYOR_MOVEMENT = 2;
+        //     _pFlag_Value.m_bflag_Conveyor_docking = true;
 
-            if(_pRobot_Status.m_iCallback_Charging_status <= 1) //Nomal
-            {
-                setGoal(goal);
-            }
-            else //Docking check...
-            {
-                ex_iDocking_CommandMode = 10; //Depart Move
-            }
+        //     if(_pRobot_Status.m_iCallback_Charging_status <= 1) //Nomal
+        //     {
+        //         setGoal(goal);
+        //     }
+        //     else //Docking check...
+        //     {
+        //         ex_iDocking_CommandMode = 10; //Depart Move
+        //     }
 
-            sleep(1);
-            //Conveyor Movement...
-            conveyor_srv.request.start = 0;
-            Conveyor_cmd_client.call(conveyor_srv);
+        //     sleep(1);
+        //     //Conveyor Movement...
+        //     conveyor_srv.request.start = 0;
+        //     Conveyor_cmd_client.call(conveyor_srv);
 
-            ROS_INFO("[patrol]: goto_conveyor-> Unloading...");
-            while(_pRobot_Status.m_iMovebase_Result != 3)
-            {
-                if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
-                {
-                    goto_goal_id.id = "";
-                    ROS_INFO("Goto Cancel call");
-                    GotoCancel_pub.publish(goto_goal_id);
-                    _pFlag_Value.m_bflag_goto_cancel = true;
-                }
-                else
-                    usleep(1000000); //100ms
-            }
-            _pRobot_Status.m_iMovebase_Result = 0;
-            _pFlag_Value.m_bflag_goto_cancel = false;
+        //     ROS_INFO("[patrol]: goto_conveyor-> Unloading...");
+        //     while(_pRobot_Status.m_iMovebase_Result != 3)
+        //     {
+        //         if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
+        //         {
+        //             goto_goal_id.id = "";
+        //             ROS_INFO("Goto Cancel call");
+        //             GotoCancel_pub.publish(goto_goal_id);
+        //             _pFlag_Value.m_bflag_goto_cancel = true;
+        //         }
+        //         else
+        //             usleep(1000000); //100ms
+        //     }
+        //     _pRobot_Status.m_iMovebase_Result = 0;
+        //     _pFlag_Value.m_bflag_goto_cancel = false;
 
-            //Conveyor Movement...
-            sleep(1);
-            conveyor_srv.request.start = 1;
-            Conveyor_cmd_client.call(conveyor_srv);
-            ROS_INFO("CN1 CAll...");
+        //     //Conveyor Movement...
+        //     sleep(1);
+        //     conveyor_srv.request.start = 1;
+        //     Conveyor_cmd_client.call(conveyor_srv);
+        //     ROS_INFO("CN1 CAll...");
 
-            while(_pRobot_Status.m_iCallback_Charging_status != 13)
-            {
-                if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
-                {
-                    goto_goal_id.id = "";
-                    ROS_INFO("Goto Cancel call");
-                    GotoCancel_pub.publish(goto_goal_id);
-                    _pFlag_Value.m_bflag_goto_cancel = true;
-                }
-                else
-                    sleep(1); //1 sec
-            }
+        //     while(_pRobot_Status.m_iCallback_Charging_status != 13)
+        //     {
+        //         if(!_pFlag_Value.m_bflag_patrol2 && !_pFlag_Value.m_bflag_goto_cancel)
+        //         {
+        //             goto_goal_id.id = "";
+        //             ROS_INFO("Goto Cancel call");
+        //             GotoCancel_pub.publish(goto_goal_id);
+        //             _pFlag_Value.m_bflag_goto_cancel = true;
+        //         }
+        //         else
+        //             sleep(1); //1 sec
+        //     }
 
-            //Unloading Finish Check
-            while(_pRobot_Status.m_iConveyor_Sensor_info <= 1)
-            {
-                ROS_INFO("Unloading Loop Finish Wait...");
-                sleep(1); //1 sec
-            }
+        //     //Unloading Finish Check
+        //     while(_pRobot_Status.m_iConveyor_Sensor_info <= 1)
+        //     {
+        //         ROS_INFO("Unloading Loop Finish Wait...");
+        //         sleep(1); //1 sec
+        //     }
 
-            sleep(1);
-            //Conveyor Movement...
-            conveyor_srv.request.start = 0;
-            Conveyor_cmd_client.call(conveyor_srv);
+        //     sleep(1);
+        //     //Conveyor Movement...
+        //     conveyor_srv.request.start = 0;
+        //     Conveyor_cmd_client.call(conveyor_srv);
 
-        }
+        // }
         
-} 230707 mwcha */ 
         sleep(1); //1sec
     }
     pthread_cancel(p_auto_thread); //Thread2 kill
 }
 
-//add _ GUI Button callback fuction...
 
+//add _ GUI Button callback fuction...
 void RVIZ_GUI_Callback(const std_msgs::String::ConstPtr& msg)
 {
     geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+
     if(msg->data == "STOP") //Stop...
     {
         goto_goal_id.id = "";
@@ -4811,11 +4595,9 @@ void RVIZ_GUI_Callback(const std_msgs::String::ConstPtr& msg)
         GotoCancel_pub.publish(goto_goal_id);
         ex_iDocking_CommandMode = 0;
 
-        	
         cmd->linear.x =  0.0; 
         cmd->angular.z = 0.0;
         cmdpub_.publish(cmd);
-        
     }
 
     if(msg->data == "GETDB") //Read JSON file...
@@ -4824,7 +4606,7 @@ void RVIZ_GUI_Callback(const std_msgs::String::ConstPtr& msg)
         Read_virtual_wall_JSON();
         Read_speed_zone_JSON();
     }
-    
+
     if(msg->data == "SETDB") //Write JSON file...
     {
         ROS_INFO("Write Virtual Wall JSON file !");
@@ -4944,20 +4726,21 @@ void RVIZ_GUI_Goto_Callback(const std_msgs::String::ConstPtr& msg)
 
         m_bGoto = false; //reset
     }
-    
 }
-	
+
 int m_iNext_count3 = 0;
 void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
 {
     //read file path
     std::ifstream ifs("/home/tetra/virtualwall.json");
+    
     int m_ilist_count = 0;
     int m_ilist_count_size = 0;
     int m_iInt_count2 = 0;
     int m_iNext_count2 = 0;
     int m_iInt_count3 = 0;
     //int m_iNext_count3 = 0;
+
     m_ilist_count = msg->z;
 
     switch(m_ilist_count)
@@ -4968,6 +4751,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             _pWallDataPoint.m_dform_x[0] = msg->x;
             _pWallDataPoint.m_dform_y[0] = msg->y;
             _pWallDataPoint.m_dform_z[0] = 0.0;
+
             //View _Ignition Point...
             node.header.frame_id = "/map";
             node.header.stamp = ros::Time(0); //ros::Time::now(); 
@@ -4986,15 +4770,18 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node.scale.x = 0.2;
             node.scale.y = 0.2;
             node.scale.z = 0.2;
+
             node.lifetime = ros::Duration(3.0);
 
             //Publish
             landmark_pub.publish(node);
+
             break;
         case 2:
             _pWallDataPoint.m_dform_x[1] = msg->x;
             _pWallDataPoint.m_dform_y[1] = msg->y;
             _pWallDataPoint.m_dform_z[1] = 0.0;
+
             //View _Ignition Point...
             node.header.frame_id = "/map";
             node.header.stamp = ros::Time(0); //ros::Time::now(); 
@@ -5019,7 +4806,9 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node.scale.x = 0.2;
             node.scale.y = 0.2;
             node.scale.z = 0.2;
+
             node.lifetime = ros::Duration(3.0);
+
             //Publish
             landmark_pub.publish(node);
             break;
@@ -5027,6 +4816,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             _pWallDataPoint.m_dform_x[2] = msg->x;
             _pWallDataPoint.m_dform_y[2] = msg->y;
             _pWallDataPoint.m_dform_z[2] = 0.0;
+
             //View _Ignition Point...
             node.header.frame_id = "/map";
             node.header.stamp = ros::Time(0); //ros::Time::now(); 
@@ -5051,7 +4841,9 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node.scale.x = 0.2;
             node.scale.y = 0.2;
             node.scale.z = 0.2;
+
             node.lifetime = ros::Duration(3.0);
+
             //Publish
             landmark_pub.publish(node);
             break;
@@ -5059,6 +4851,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             _pWallDataPoint.m_dform_x[3] = msg->x;
             _pWallDataPoint.m_dform_y[3] = msg->y;
             _pWallDataPoint.m_dform_z[3] = 0.0;
+
             //View _Ignition Point...
             node.header.frame_id = "/map";
             node.header.stamp = ros::Time(0); //ros::Time::now(); 
@@ -5083,13 +4876,15 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node.scale.x = 0.2;
             node.scale.y = 0.2;
             node.scale.z = 0.2;
+
             node.lifetime = ros::Duration(3.0);
-            
+
             //Publish
             landmark_pub.publish(node);
             
             m_ilist_count_size = _pWallDataPoint.m_ilist_count_size += 1;
             //printf("m_ilist_count_size: %d \n", m_ilist_count_size);
+
            
             virtual_obstacle.list.resize(m_ilist_count_size);
             for(int i=(m_ilist_count_size-1); i<m_ilist_count_size; i++)
@@ -5102,9 +4897,12 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
                     virtual_obstacle.list[i].form[j].y = _pWallDataPoint.m_dform_y[m_iNext_count2 + j];
                     virtual_obstacle.list[i].form[j].z = _pWallDataPoint.m_dform_z[m_iNext_count2 + j];
                 }
-                m_iNext_count2 += m_iInt_count2;               
+                m_iNext_count2 += m_iInt_count2;
+                
             }
+            
             virtual_obstacle_pub.publish(virtual_obstacle);
+
             //write JSON..
             if(ifs)
             {
@@ -5112,6 +4910,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
                 Document doc;
                 doc.ParseStream(isw);
                 Document::AllocatorType& allocator = doc.GetAllocator();
+
                 if(m_ilist_count_size > doc["list_count"].Size())
                 {
                     doc["list_count"].PushBack(m_ilist_count,allocator);
@@ -5124,6 +4923,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
                             doc["form_x"].PushBack(floor(virtual_obstacle.list[i].form[j].x * 1000.f + 0.5) / 1000.f ,allocator);
                             doc["form_y"].PushBack(floor(virtual_obstacle.list[i].form[j].y * 1000.f + 0.5) / 1000.f ,allocator);
                             doc["form_z"].PushBack(floor(virtual_obstacle.list[i].form[j].z * 1000.f + 0.5) / 1000.f ,allocator);
+
                         }   
                         m_iNext_count3 += m_iInt_count3;
                         //printf("[%d]m_iInt_count3: %d , m_iNext_count3: %d \n",i, m_iInt_count3, m_iNext_count3);
@@ -5144,6 +4944,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
                         m_iNext_count3 += m_iInt_count3;
                     }
                 }
+                
                 // write file
                 std::ofstream ofs("/home/tetra/virtualwall.json");
                 OStreamWrapper osw(ofs);
@@ -5152,6 +4953,7 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
                     
             }
             
+
             //View _Ignition Point to Text...
             node_name.header.frame_id = "/map";
             node_name.header.stamp = ros::Time(0);
@@ -5167,8 +4969,10 @@ void RVIZ_Wall_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node_name.color.g = 0.5;
             node_name.color.b = 0.0; 
             node_name.scale.z = 0.6;
+
             //Publish
             landmark_pub.publish(node_name);
+
             break;
         default:
             break;
@@ -5179,8 +4983,10 @@ void RVIZ_Restrict_setting_Callback(const geometry_msgs::Point::ConstPtr& msg)
 {
     //read file path
     std::ifstream ifs("/home/tetra/virtualwall.json");
+
     int m_ilist_num = msg->x - 1.0;
     int m_iflag = msg->y;
+
     //printf("[RVIZ_Restrict_setting_Callback]: %d \n", m_ilist_num);
     if(m_iflag)
     {
@@ -5192,8 +4998,12 @@ void RVIZ_Restrict_setting_Callback(const geometry_msgs::Point::ConstPtr& msg)
             virtual_obstacle.list[m_ilist_num].form[j].x = 0.0;
             virtual_obstacle.list[m_ilist_num].form[j].y = 0.0;
             virtual_obstacle.list[m_ilist_num].form[j].z = 0.0;
+
         }
-         virtual_obstacle_pub.publish(virtual_obstacle);   
+    
+        
+        virtual_obstacle_pub.publish(virtual_obstacle);   
+
         //View _Ignition Point to Text...
         node_name.header.frame_id = "/map";
         node_name.header.stamp = ros::Time(0);
@@ -5202,6 +5012,7 @@ void RVIZ_Restrict_setting_Callback(const geometry_msgs::Point::ConstPtr& msg)
         node_name.id = msg->x;
         node_name.action = visualization_msgs::Marker::DELETE;
         landmark_pub.publish(node_name);
+
         //write JSON..
         if(ifs)
         {
@@ -5209,6 +5020,7 @@ void RVIZ_Restrict_setting_Callback(const geometry_msgs::Point::ConstPtr& msg)
             Document doc;
             doc.ParseStream(isw);
             Document::AllocatorType& allocator = doc.GetAllocator();
+
             // change value
             for(int j=0; j<4; j++)
             {
@@ -5222,6 +5034,7 @@ void RVIZ_Restrict_setting_Callback(const geometry_msgs::Point::ConstPtr& msg)
             OStreamWrapper osw(ofs);
             Writer<OStreamWrapper> writer(osw);
             doc.Accept(writer);
+
         } 
     }
 }
@@ -5232,9 +5045,12 @@ void RVIZ_Zone_Callback(const geometry_msgs::Point::ConstPtr& msg)
 {
     //read file path
     std::ifstream ifs("/home/tetra/speedzone.json");
+
     int m_ilist_count2 = 0;
     int m_ilist_count_size2 = 0;
+
     int m_iInt_count3 = 0;
+
     m_ilist_count2 = msg->z;
     switch(m_ilist_count2)
     {
@@ -5274,11 +5090,13 @@ void RVIZ_Zone_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node2.lifetime = ros::Duration(0.0);
             //Publish
             landmark_pub2.publish(node2);
+
             //4 POINT Calc_CCW rotation ////////////////////////////////////////////////
             _pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[0] = {_pZoneDataPoint.m_dform_x2[0], _pZoneDataPoint.m_dform_y2[0]};
             _pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[1] = {_pZoneDataPoint.m_dform_x2[0], _pZoneDataPoint.m_dform_y2[1]};
             _pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[2] = {_pZoneDataPoint.m_dform_x2[1], _pZoneDataPoint.m_dform_y2[1]};
             _pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[3] = {_pZoneDataPoint.m_dform_x2[1], _pZoneDataPoint.m_dform_y2[0]};
+
             vV[_pZoneDataPoint.m_iZone_count].push_back(_pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[0]);
             vV[_pZoneDataPoint.m_iZone_count].push_back(_pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[1]);
             vV[_pZoneDataPoint.m_iZone_count].push_back(_pTagList[_pZoneDataPoint.m_iZone_count]._pTagPoint[2]);
@@ -5301,6 +5119,7 @@ void RVIZ_Zone_Callback(const geometry_msgs::Point::ConstPtr& msg)
             node_name2.scale.z = 0.5;
             //Publish
             landmark_pub2.publish(node_name2);
+
             //write JSON file//
             if(ifs)
             {
@@ -5308,37 +5127,51 @@ void RVIZ_Zone_Callback(const geometry_msgs::Point::ConstPtr& msg)
                 Document doc;
                 doc.ParseStream(isw);
                 Document::AllocatorType& allocator = doc.GetAllocator();
+
                 doc["tag_list"].PushBack(4,allocator);
+
                 doc["form_x"].PushBack(floor(_pZoneDataPoint.m_dform_x2[0] * 1000.f + 0.5) / 1000.f ,allocator);
                 doc["form_y"].PushBack(floor(_pZoneDataPoint.m_dform_y2[0] * 1000.f + 0.5) / 1000.f ,allocator);
+
                 doc["form_x"].PushBack(floor(_pZoneDataPoint.m_dform_x2[0] * 1000.f + 0.5) / 1000.f ,allocator);
                 doc["form_y"].PushBack(floor(_pZoneDataPoint.m_dform_y2[1] * 1000.f + 0.5) / 1000.f ,allocator);
+
                 doc["form_x"].PushBack(floor(_pZoneDataPoint.m_dform_x2[1] * 1000.f + 0.5) / 1000.f ,allocator);
                 doc["form_y"].PushBack(floor(_pZoneDataPoint.m_dform_y2[1] * 1000.f + 0.5) / 1000.f ,allocator);
+
                 doc["form_x"].PushBack(floor(_pZoneDataPoint.m_dform_x2[1] * 1000.f + 0.5) / 1000.f ,allocator);
                 doc["form_y"].PushBack(floor(_pZoneDataPoint.m_dform_y2[0] * 1000.f + 0.5) / 1000.f ,allocator);
+
                 // write file
                 std::ofstream ofs("/home/tetra/speedzone.json");
                 OStreamWrapper osw(ofs);
                 Writer<OStreamWrapper> writer(osw);
                 doc.Accept(writer);
+
             }
-             _pZoneDataPoint.m_iZone_count++;
+
+            _pZoneDataPoint.m_iZone_count++;
             if(node_name2.id > 0)
                 m_flag_SpeedZone = true;
+
             break;
         default:
             break;
     }
+
 }
+
 void RVIZ_Restrict_setting2_Callback(const geometry_msgs::Point::ConstPtr& msg)
 {
     //read file path
     std::ifstream ifs("/home/tetra/speedzone.json");
+
     int m_ilist_num2 = msg->x;
     int m_iflag2 = msg->y;
+
     _pTagList[_pZoneDataPoint.m_iZone_count-1].dSpeed_value = msg->z;
     //printf("_pTagList[%d].dSpeed_value: %.3f \n", _pZoneDataPoint.m_iZone_count, _pTagList[_pZoneDataPoint.m_iZone_count-1].dSpeed_value);
+
     if(m_iflag2)
     {
         //View _Ignition Point...
@@ -5350,6 +5183,7 @@ void RVIZ_Restrict_setting2_Callback(const geometry_msgs::Point::ConstPtr& msg)
         node2.action = visualization_msgs::Marker::DELETE; 
         //Publish
         landmark_pub2.publish(node2);
+
         //View _Ignition Point to Text...
         node_name2.header.frame_id = "/map";
         node_name2.header.stamp = ros::Time(0);
@@ -5360,6 +5194,7 @@ void RVIZ_Restrict_setting2_Callback(const geometry_msgs::Point::ConstPtr& msg)
         //Publish
         landmark_pub2.publish(node_name2);
     }
+
     //write JSON file//
     if(ifs)
     {
@@ -5367,28 +5202,31 @@ void RVIZ_Restrict_setting2_Callback(const geometry_msgs::Point::ConstPtr& msg)
         Document doc;
         doc.ParseStream(isw);
         Document::AllocatorType& allocator = doc.GetAllocator();
+
         doc["speed"].PushBack(floor(_pTagList[_pZoneDataPoint.m_iZone_count-1].dSpeed_value * 1000.f + 0.5) / 1000.f ,allocator);
+
         // write file
         std::ofstream ofs("/home/tetra/speedzone.json");
         OStreamWrapper osw(ofs);
         Writer<OStreamWrapper> writer(osw);
         doc.Accept(writer);
+
     }
 }
 
 void Reset_Call_service()
 {
-	_pFlag_Value.m_bFlag_nomotion = false;
+    _pFlag_Value.m_bFlag_nomotion = false;
 
-	//IMU reset//
-	euler_angle_reset_cmd_client.call(euler_angle_reset_srv);
-	printf("## IMU Reset ! \n");
-	//tetra odometry Reset//
-	tetra_PoseRest.data = m_iReset_flag;
-	PoseReset_pub.publish(tetra_PoseRest);
-	usleep(100000);
+    //IMU reset//
+    euler_angle_reset_cmd_client.call(euler_angle_reset_srv);
+    printf("## IMU Reset ! \n");
+    //tetra odometry Reset//
+    tetra_PoseRest.data = m_iReset_flag;
+    PoseReset_pub.publish(tetra_PoseRest);
+    usleep(100000);
 
-    	//robot_localization::SetPose ekf_reset;
+    //robot_localization::SetPose ekf_reset;
 	setpose_srv.request.pose.header.frame_id = tf_prefix_ + "/odom";
 	setpose_srv.request.pose.header.stamp = ros::Time(0); //ros::Time::now();
 
@@ -5404,56 +5242,54 @@ void Reset_Call_service()
 	setpose_srv.request.pose.pose.covariance[0] = 0.25;
 	setpose_srv.request.pose.pose.covariance[6 * 1 + 1] = 0.25;
 	setpose_srv.request.pose.pose.covariance[6 * 5 + 5] = 0.06853892326654787;
-
+    
 	SetPose_cmd_client.call(setpose_srv); //Set_pose call//
 	printf("##Set_Pose(EKF)2! \n");
 
-	initPose_.header.stamp = ros::Time(0); //ros::Time::now(); 
-	initPose_.header.frame_id = "map";
-	//position
-	initPose_.pose.pose.position.x = _pReset_srv.init_position_x;
-	initPose_.pose.pose.position.y = _pReset_srv.init_position_y;
-	initPose_.pose.pose.position.z = _pReset_srv.init_position_z;
-	//orientation
-	initPose_.pose.pose.orientation.x = _pReset_srv.init_orientation_x;
-	initPose_.pose.pose.orientation.y = _pReset_srv.init_orientation_y;
-	initPose_.pose.pose.orientation.z = _pReset_srv.init_orientation_z;
-	initPose_.pose.pose.orientation.w = _pReset_srv.init_orientation_w;
+    initPose_.header.stamp = ros::Time(0); //ros::Time::now(); 
+    initPose_.header.frame_id = "map";
+    //position
+    initPose_.pose.pose.position.x = _pReset_srv.init_position_x;
+    initPose_.pose.pose.position.y = _pReset_srv.init_position_y;
+    initPose_.pose.pose.position.z = _pReset_srv.init_position_z;
+    //orientation
+    initPose_.pose.pose.orientation.x = _pReset_srv.init_orientation_x;
+    initPose_.pose.pose.orientation.y = _pReset_srv.init_orientation_y;
+    initPose_.pose.pose.orientation.z = _pReset_srv.init_orientation_z;
+    initPose_.pose.pose.orientation.w = _pReset_srv.init_orientation_w;
 
-	initPose_.pose.covariance[0] = 0.25;
-	initPose_.pose.covariance[6 * 1 + 1] = 0.25;
-	initPose_.pose.covariance[6 * 5 + 5] = 0.06853892326654787;
+    initPose_.pose.covariance[0] = 0.25;
+    initPose_.pose.covariance[6 * 1 + 1] = 0.25;
+    initPose_.pose.covariance[6 * 5 + 5] = 0.06853892326654787;
 
-	initialpose_pub.publish(initPose_);
-	printf("##Set_initPose(2D Estimate)2! \n");
+    initialpose_pub.publish(initPose_);
+    printf("##Set_initPose(2D Estimate)2! \n");
 
-    //usleep(500000);
+    usleep(500000);
 
-	_pFlag_Value.m_bFlag_nomotion = true;
+    _pFlag_Value.m_bFlag_nomotion = true;
+
 }
 
 bool SetEKF_Command(tetraDS_service::setekf::Request &req, 
 				    tetraDS_service::setekf::Response &res)
 {   
-	bool bResult = false;
+    bool bResult = false;
 
-	_pReset_srv.init_position_x = req.init_position_x;
-	_pReset_srv.init_position_y = req.init_position_y;
-	_pReset_srv.init_position_z = req.init_position_z;
+    _pReset_srv.init_position_x = req.init_position_x;
+    _pReset_srv.init_position_y = req.init_position_y;
+    _pReset_srv.init_position_z = req.init_position_z;
 
-	_pReset_srv.init_orientation_x = req.init_orientation_x;
-	_pReset_srv.init_orientation_y = req.init_orientation_y;
-	_pReset_srv.init_orientation_z = req.init_orientation_z;
-	_pReset_srv.init_orientation_w = req.init_orientation_w;
+    _pReset_srv.init_orientation_x = req.init_orientation_x;
+    _pReset_srv.init_orientation_y = req.init_orientation_y;
+    _pReset_srv.init_orientation_z = req.init_orientation_z;
+    _pReset_srv.init_orientation_w = req.init_orientation_w;
 
-	_pReset_srv.bflag_reset = true;
+    _pReset_srv.bflag_reset = true;
 
-	printf("[SetEKF_Command]: %.5f, %.5f, %.5f, %.5f, %.5f, %.5f, %.5f \n", _pReset_srv.init_position_x,_pReset_srv.init_position_y,_pReset_srv.init_position_z,
-	_pReset_srv.init_orientation_x, _pReset_srv.init_orientation_y, _pReset_srv.init_orientation_z, _pReset_srv.init_orientation_w);
+    //Reset_Call_service();
 
-	//Reset_Call_service();
-
-	bResult = true;
+    bResult = true;
 	res.command_Result = bResult;
 	return true;
 }
@@ -5463,6 +5299,8 @@ void InitialposeCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPt
 {
     //printf("## InitialposeCallback ## \n");
     _pFlag_Value.m_bFlag_Initialpose = true;
+
+
 }
 
 /////*******************************************************************************//////
@@ -5472,6 +5310,7 @@ int main (int argc, char** argv)
     signal(SIGINT,my_handler);
 
     ros::init(argc, argv, "tetraDS_service", ros::init_options::NoSigintHandler);
+
     ros::NodeHandle nh;
     cmdpub_ = nh.advertise<geometry_msgs::Twist>("cmd_vel",100);
     ros::Subscriber cmdsub_ = nh.subscribe<geometry_msgs::Twist>("cmd_vel", 100, cmd_vel_Callback);
@@ -5481,7 +5320,7 @@ int main (int argc, char** argv)
     ros::Subscriber sub_amcl = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose", 100 ,poseAMCLCallback);
     //Navigation Result//
     ros::Subscriber result_sub = nh.subscribe<move_base_msgs::MoveBaseActionResult>("move_base/result", 10, resultCallback);
-    ros::Subscriber status_sub = nh.subscribe<actionlib_msgs::GoalStatusArray>("move_base/status", 10, statusCallback); //add...
+    ros::Subscriber status_sub = nh.subscribe<actionlib_msgs::GoalStatusArray>("move_base/status", 10, statusCallback);
     //Navigation Cancel//
     GotoCancel_pub = nh.advertise<actionlib_msgs::GoalID>("move_base/cancel",10);
     //PoseReset//
@@ -5495,9 +5334,9 @@ int main (int argc, char** argv)
     //Depthimage to scan subscriber//
     ros::Subscriber pcl1_sub = nh.subscribe("pcl_1", 100, PCL1_Callback); //Front Realsense D435F
     //ros::Subscriber pcl2_sub = nh.subscribe("pcl_2", 100, PCL2_Callback); //Rear Realsense D435F
-
-    //Cygbot LiDAR to scan subscriber//
+    //Cygbot LiDARto scan subscriber//
     ros::Subscriber cygbot_sub = nh.subscribe("scan_laser", 100, Cygbot_Callback); //Rear Cygbot LiDAR
+
     //virtual costmap_pub
     virtual_obstacle_pub = nh.advertise<virtual_costmap_layer::Obstacles>("virtual_costamp_layer/obsctacles", 100);
     virtual_obstacle2_pub = nh.advertise<virtual_costmap_layer2::Obstacles2>("virtual_costamp_layer2/obsctacles", 100);
@@ -5514,6 +5353,7 @@ int main (int argc, char** argv)
     //Joystick//
     ros::NodeHandle njoy;
     ros::Subscriber joy_sub = njoy.subscribe<sensor_msgs::Joy>("joy", 10, joyCallback);
+
     //Read HOME Docking ID Param Read//
     nh.getParam("HOME_ID", _pRobot_Status.HOME_ID);
     printf("##HOME_ID: %d \n", _pRobot_Status.HOME_ID);
@@ -5523,6 +5363,8 @@ int main (int argc, char** argv)
     //Read Max_linear_Velocity
     nh.getParam("max_vel_x", _pDynamic_param.MAX_Linear_velocity);
     printf("##max_vel_x: %f \n", _pDynamic_param.MAX_Linear_velocity);
+    _pDynamic_param.MAX_Linear_velocity_origin = _pDynamic_param.MAX_Linear_velocity;
+	
     ros::param::get("tf_prefix", tf_prefix_);
 
     //add GUI...
@@ -5530,17 +5372,21 @@ int main (int argc, char** argv)
     ros::Subscriber GUI_sub = nGUI.subscribe("/rviz_visual_tools_gui_btn", 10, RVIZ_GUI_Callback);
     ros::Subscriber GUI_Str_sub = nGUI.subscribe("/rviz_visual_tools_gui_location_name", 10, RVIZ_GUI_Str_Callback);
     ros::Subscriber GUI_goto_sub = nGUI.subscribe("/rviz_visual_tools_gui_goto_location_name", 10, RVIZ_GUI_Goto_Callback);
-
+	
     //add rviz tool wall create...    
     ros::Subscriber Wall_data_sub = nGUI.subscribe<geometry_msgs::Point>("/wall_rectangle_data", 10, RVIZ_Wall_Callback);
     //add rviz tool restrict_settings...
     ros::Subscriber Wall_clear_sub = nGUI.subscribe<geometry_msgs::Point>("/restrict_settings", 10, RVIZ_Restrict_setting_Callback);
     landmark_pub = nGUI.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+
     //add rviz tool zone create...
     ros::Subscriber Zone_data_sub = nGUI.subscribe<geometry_msgs::Point>("/zone_rectangle_data", 10, RVIZ_Zone_Callback);
     //add rviz tool restrict_settings2...
     ros::Subscriber Zone_clear_sub = nGUI.subscribe<geometry_msgs::Point>("/restrict_settings2", 10, RVIZ_Restrict_setting2_Callback);
     landmark_pub2 = nGUI.advertise<visualization_msgs::Marker>("visualization_marker2", 1);
+    
+    ros::NodeHandle nTest;
+    landmark_pub = nTest.advertise<visualization_msgs::Marker>("visualization_marker", 1); // 240314 mwcha
 
     //Command Service//
     ros::NodeHandle service_h;
@@ -5587,7 +5433,8 @@ int main (int argc, char** argv)
     virtual_obstacle_service = service_h.advertiseService("virtual_obstacle_cmd", Virtual_Obstacle_Command);
     //Set EKF & IMU Reset Service//
     set_ekf_service = service_h.advertiseService("set_ekf_cmd", SetEKF_Command);
-    
+    //add.. Manual Backmove Service ... 240125//
+    //manual_backmove_service = service_h.advertiseService("manual_backmove_cmd", Manual_Backmove_Command);
     //usb_cam Service Client...
     ros::NodeHandle client_h;
     usb_cam_On_client = client_h.serviceClient<std_srvs::Empty>("usb_cam/start_capture");
@@ -5609,8 +5456,10 @@ int main (int argc, char** argv)
     euler_angle_reset_cmd_client = client_h.serviceClient<tetraDS_service::euler_angle_reset>("euler_angle_reset_cmd");
     //robot_localization Service Client//
     SetPose_cmd_client = client_h.serviceClient<tetraDS_service::SetPose>("set_pose");
+
     //cygbot_mark toggle_enabled Service Client//
     toggle_enabled_client = client_h.serviceClient<std_srvs::SetBool>("move_base/local_costmap/cygbot_obstacle_layer/cygbot_mark/toggle_enabled");
+
     //Infomation_subscriber//
     ros::NodeHandle nInfo;
     ros::Subscriber tetra_battery = nInfo.subscribe<std_msgs::Int32>("tetra_battery", 1, BatteryCallback);
@@ -5648,6 +5497,7 @@ int main (int argc, char** argv)
     }
     pointcloud_.point_step = offset;
     pointcloud_.row_step   = pointcloud_.point_step * pointcloud_.width;
+
     pointcloud_.data.resize(3 * pointcloud_.point_step);
     pointcloud_.is_bigendian = false;
     pointcloud_.is_dense     = true;
@@ -5665,8 +5515,8 @@ int main (int argc, char** argv)
     ros::NodeHandle docking_nh;
     docking_progress.data = 0;
     docking_progress_pub = docking_nh.advertise<std_msgs::Int32>("docking_progress", 1);
-    //Docking positioning publish
-    //positioning_pub = docking_nh.advertise<geometry_msgs::Pose2D>("positioning", 10);
+    //Docking positioning publish ... 240314 mwcha
+    positioning_pub = docking_nh.advertise<geometry_msgs::Pose2D>("positioning", 10);
     
     /*Thread Create...*/
     int docking_thread_id, auto_thread_id;
@@ -5711,7 +5561,7 @@ int main (int argc, char** argv)
     while(ros::ok())
     {
         ros::spinOnce();
-	    
+
         // add move_base Die Check Loop
         nh.getParam("active_map", m_bActive_map_check);
         if(m_bActive_map_check)
@@ -5761,11 +5611,13 @@ int main (int argc, char** argv)
         //IMU Reset Loop//
         if(m_iTimer_cnt >= 500) //10 sec_polling
         {
-	    //costmap clear call//
+            //costmap clear call//
             clear_costmap_client.call(m_request);
+
             m_iTimer_cnt = 0;
             Reset_Robot_Pose();
             //ROS_INFO("Reset_Robot_Pose Call !");
+
             if(_pFlag_Value.m_bflag_auto_patrol)
             {
                 ex_iDocking_CommandMode = 200;
@@ -5775,6 +5627,10 @@ int main (int argc, char** argv)
         {
             if(_pRobot_Status.m_iCallback_Charging_status == 2 || _pRobot_Status.m_iCallback_Charging_status == 3 || _pRobot_Status.m_iCallback_Charging_status == 6 || _pRobot_Status.m_iCallback_Charging_status == 7)
             {
+  
+                //todo.. 240315
+                LED_Toggle_Control(1, 3,100,3,100); //(int de_index, int light_acc, int High_brightness, int light_dec, int Low_brightness)
+                LED_Turn_On(63); //White led
                 m_iTimer_cnt ++;
             }
             else
@@ -5801,7 +5657,7 @@ int main (int argc, char** argv)
                 geometry_msgs::TransformStamped ts_msg;
                 try
                 {
-                    listener.waitForTransform("/map", tf_prefix_ + "/base_footprint", ros::Time(0), ros::Duration(5.0));
+                    listener.waitForTransform("/map", tf_prefix_ + "/base_footprint", ros::Time(0), ros::Duration(5.0)); //3.0
                     listener.lookupTransform("/map", tf_prefix_ + "/base_footprint", ros::Time(0), transform);
                     tf::transformStampedTFToMsg(transform, ts_msg);
 
@@ -5812,7 +5668,7 @@ int main (int argc, char** argv)
                     _pTF_pose.poseTFqy = ts_msg.transform.rotation.y;
                     _pTF_pose.poseTFqz = ts_msg.transform.rotation.z;
                     _pTF_pose.poseTFqw = ts_msg.transform.rotation.w;
-
+                      
                 }
                 catch (tf::TransformException ex)
                 {
@@ -5820,13 +5676,48 @@ int main (int argc, char** argv)
                     continue;
                 }
 
+                //Speed Zone Check Loop //////////////////////////////////////////////////////////////////////////////
+                if(m_flag_SpeedZone)
+                {
+                    POINT m_ptPos = {_pTF_pose.poseTFx, _pTF_pose.poseTFy};
+                    for(int i=0; i < _pZoneDataPoint.m_iZone_count; i++)
+                    {
+                        if(isinner(m_ptPos, vV[i]))
+                        {
+                            if(!m_flag_major_update[i])
+                            {
+                                Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_x", _pTagList[i].dSpeed_value);
+                                _pDynamic_param.MAX_Linear_velocity = _pTagList[i].dSpeed_value;
+                                //printf("_pTagList[%d].dSpeed_value: %.3f \n", i, _pTagList[i].dSpeed_value);
+
+                                //printf(" Inside Check[%d] !!\n", i);
+                                m_flag_major_update[i] = true;
+                                m_flag_minor_update[i] = false;
+                            }
+                        }
+                        else
+                        {
+
+                            if(!m_flag_minor_update[i])
+                            {
+                                Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_x", _pDynamic_param.MAX_Linear_velocity_origin);
+                                _pDynamic_param.MAX_Linear_velocity = _pDynamic_param.MAX_Linear_velocity_origin;
+
+                                //printf(" Outside Check[%d] !!\n", i);
+                                m_flag_minor_update[i] = true;
+                                m_flag_major_update[i] = false;
+                            }
+                        }
+                    }
+                }    
+
                 //map to odom TF Pose////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                 tf::StampedTransform transform2;
                 geometry_msgs::TransformStamped ts_msg2;
                 bool bCheck_waitForTransform = false;
                 try
                 {
-                    bCheck_waitForTransform = listener2.waitForTransform("/map", tf_prefix_ + "/odom", ros::Time(0), ros::Duration(3.0)); //5.0
+                    bCheck_waitForTransform = listener2.waitForTransform("/map", tf_prefix_ + "/odom", ros::Time(0), ros::Duration(5.0));
                     listener2.lookupTransform("/map", tf_prefix_ + "/odom", ros::Time(0), transform2);
                     tf::transformStampedTFToMsg(transform2, ts_msg2);
 
@@ -5849,41 +5740,11 @@ int main (int argc, char** argv)
                     ROS_ERROR("[TF_Transform_Error2(map to odom)]: %s", ex2.what());
                     continue;
                 }
-                //Speed Zone Check Loop //////////////////////////////////////////////////////////////////////////////
-                if(m_flag_SpeedZone)
-                {
-                    POINT m_ptPos = {_pTF_pose.poseTFx, _pTF_pose.poseTFy};
-                    for(int i=0; i < _pZoneDataPoint.m_iZone_count; i++)
-                    {
-                        if(isinner(m_ptPos, vV[i]))
-                        {
-                            if(!m_flag_major_update[i])
-                            {
-                                Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_x", _pTagList[i].dSpeed_value);
-                                _pDynamic_param.MAX_Linear_velocity = _pTagList[i].dSpeed_value;
-                                //printf("_pTagList[%d].dSpeed_value: %.3f \n", i, _pTagList[i].dSpeed_value);
-                                //printf(" Inside Check[%d] !!\n", i);
-                                m_flag_major_update[i] = true;
-                                m_flag_minor_update[i] = false;
-                            }
-                        }
-                        else
-                        {
-                            if(!m_flag_minor_update[i])
-                            {
-                                Dynamic_reconfigure_Teb_Set_DoubleParam("max_vel_x", _pDynamic_param.MAX_Linear_velocity_origin);
-                                _pDynamic_param.MAX_Linear_velocity = _pDynamic_param.MAX_Linear_velocity_origin;
-                                //printf(" Outside Check[%d] !!\n", i);
-                                m_flag_minor_update[i] = true;
-                                m_flag_major_update[i] = false;
-                            }
-                        }
-                    }
-                }   
+
                 if(bCheck_waitForTransform)
                 {
                     m_iList_Count = virtual_obstacle.list.size();
-                    if(m_iList_Count > 0)
+                    if(m_iList_Count > 0 || m_bFlag_virtualWallCheck)
                     {
                         if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
                         {
@@ -5895,7 +5756,7 @@ int main (int argc, char** argv)
                         virtual_obstacle2.list.clear();
                         virtual_obstacle2.list.resize(m_iList_Count);
                         m_iList_Count2 = virtual_obstacle2.list.size();
-                        if(m_iList_Count2 > 0)
+                        if(m_iList_Count2 >= 0)
                         {
                             for(int i=0; i<m_iList_Count2; i++)
                             {
@@ -5913,28 +5774,33 @@ int main (int argc, char** argv)
                                     }
                                 }
                             }
+
                             if(m_bFlag_nomotion_call || !_pFlag_Value.m_bFlag_nomotion || m_flag_Dynamic_reconfigure_call || m_flag_setgoal || _pFlag_Value.m_bTebMarker_reconfigure_flag)
                             {
                                 loop_rate.sleep();
                                 continue;
                             }
                             virtual_obstacle2_pub.publish(virtual_obstacle2);
-                            // 231115 add
-                            if(m_iList_Count2 == 0){
-                                m_bFlag_virtualWallCheck = false;
-                            }
+                        }
+			            // 231115 add
+                        if(m_iList_Count2 == 0)
+                        {
+                            m_bFlag_virtualWallCheck = false;
                         }
 
-                    }
+                	}
                 }
                 else
                 {
                     printf("[Error]listener2.waitForTransform Fail & lookupTransform Fail!! \n");
                 }
                 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
             }
         }
+
         loop_rate.sleep();
     }
+
     return 0;
 }
