@@ -1,9 +1,9 @@
-footprint: [[0.1675,0.215], [-0.318,0.215], [-0.318,-0.215], [0.1675,-0.215]]
+footprint: [[0.1675,0.220], [-0.318,0.220], [-0.318,-0.220], [0.1675,-0.220]]
 
 obstacle_layer:
   enabled: true
   combination_method: 1
-  observation_sources: laser_scan_sensor bumper_sensor
+  observation_sources: laser_scan_sensor
   track_unknown_space: true
   observation_persistence: 0.0
   inf_is_valid: false
@@ -17,16 +17,7 @@ obstacle_layer:
     marking: true
     clearing: true
 
-  bumper_sensor:
-    obstacle_range: 0.05
-    raytrace_range: 0.15
-    inflation_radius: 0.3 
-    data_type: PointCloud2
-    topic: bumper_pointcloud
-    marking: true
-    clearing: true
-
-rgbd_obstacle_layer1:
+rgbd_obstacle_layer2: #layer1
   enabled:                  true
   voxel_decay:              1    # seconds if linear, e^n if exponential
   decay_model:              0     # 0=linear, 1=exponential, -1=persistent
@@ -34,7 +25,7 @@ rgbd_obstacle_layer1:
   track_unknown_space:      true  # default space is known
   max_obstacle_height:      2.0   # meters
   unknown_threshold:        20    # voxel height
-  mark_threshold:           2 #4     # voxel height
+  mark_threshold:           3 #4     # voxel height
   update_footprint_enabled: true
   combination_method:       1     # 1=max, 0=override
   obstacle_range:           1.5   # meters #default:0.8
@@ -46,10 +37,10 @@ rgbd_obstacle_layer1:
   observation_sources:      rgbd1_mark rgbd1_clear
   rgbd1_mark:
     data_type: PointCloud2
-    topic: camera1/depth/color/points
+    topic: camera2/depth/color/points
     marking: true
     clearing: false
-    min_obstacle_height: 0.07    # default 0, meters
+    min_obstacle_height: 0.05 #0.03     # default 0, meters
     max_obstacle_height: 2.0     # default 3, meters
     expected_update_rate: 0.0    # default 0, if not updating at this rate at least, remove from buffer
     observation_persistence: 0.0 # default 0, use all measurements taken during now-value, 0=latest
@@ -59,7 +50,7 @@ rgbd_obstacle_layer1:
     clear_after_reading: true    # default false, clear the buffer after the layer gets readings from it
   rgbd1_clear:
     data_type: PointCloud2
-    topic: camera1/depth/color/points
+    topic: camera2/depth/color/points
     marking: false
     clearing: true
     max_z: 7.0                  # default 0, meters
@@ -133,3 +124,4 @@ virtual_layer2:
      - [[0.4, 0.0]]
      - [[-0.4, 0.0],[0.0, 0.4]]
      - [[5, 5],[-5, 5],[-5, -5],[5, -5]]
+

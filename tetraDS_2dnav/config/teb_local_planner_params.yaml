@@ -8,7 +8,7 @@ TebLocalPlannerROS:
  teb_autosize: true
  dt_ref: 0.3
  dt_hysteresis: 0.03
- min_samples: 3
+ min_samples: 3 #5
  max_samples: 50
  global_plan_overwrite_orientation: true
  global_plan_viapoint_sep: 1.0 #0.5
@@ -24,7 +24,7 @@ TebLocalPlannerROS:
  # Robot
  max_vel_x: 0.8
  max_vel_y: 0.0
- max_vel_x_backwards: 0.11
+ max_vel_x_backwards: 0.05 #0.15
  max_vel_theta: 0.15
  acc_lim_x: 2.0
  acc_lim_y: 0.0 
@@ -32,10 +32,14 @@ TebLocalPlannerROS:
  min_turning_radius: 0.0
  wheelbase: 0.0
  cmd_angle_instead_rotvel: false
+
  footprint_model:
    types: "line"
-   line_start: [0.0, 0.0] # for type "line"
-   line_end: [-0.1275, 0.0] # for type "line"
+   line_start: [0.0, 0.0]
+   line_end: [-0.188, 0.0]
+
+#types: "polygon"
+#vertices: [[0.240,0.260], [-0.490,0.260], [-0.490,-0.260], [0.240,-0.260]]
     
  # GoalTolerance
  xy_goal_tolerance: 0.05
@@ -43,13 +47,13 @@ TebLocalPlannerROS:
  free_goal_vel: false
 
  # Obstacles
- min_obstacle_dist: 0.45
+ min_obstacle_dist: 0.44
  include_costmap_obstacles: true
  costmap_obstacles_behind_robot_dist: 1.5
  obstacle_poses_affected: 30
- inflation_dist: 0.46
+ inflation_dist: 0.5
  include_dynamic_obstacles: false
- dynamic_obstacle_inflation_dist: 0.45
+ dynamic_obstacle_inflation_dist: 0.4
  legacy_obstacle_association: false
  obstacle_association_force_inclusion_factor: 1.5
  obstacle_association_cutoff_factor: 5
@@ -60,7 +64,7 @@ TebLocalPlannerROS:
  # Optimization
  no_inner_iterations: 5
  no_outer_iterations: 4
- penalty_epsilon: 0.1
+ penalty_epsilon: 0.04
  weight_max_vel_x: 1.0
  weight_max_vel_y: 0.0
  weight_max_vel_theta: 1.0
@@ -71,17 +75,17 @@ TebLocalPlannerROS:
  weight_kinematics_forward_drive: 1000.0
  weight_kinematics_turning_radius: 1.0
  weight_optimaltime: 1.0
- weight_obstacle: 20.0 #10.0
+ weight_obstacle: 20.0 #50.0
  weight_viapoint: 1.0
  weight_inflation: 0.1
- weight_dynamic_obstacle: 0.0 #1.0
- weight_dynamic_obstacle_inflation: 0.0 # 1.0
+ weight_dynamic_obstacle: 1.0
+ weight_dynamic_obstacle_inflation: 1.0
 
  # Homotopy Class Planner
  enable_homotopy_class_planning: false
  enable_multithreading: true
  simple_exploration: false
- max_number_classes: 10
+ max_number_classes: 4
  selection_cost_hysteresis: 1.0
  selection_obst_cost_scale: 1.0
  selection_viapoint_cost_scale: 1.0
