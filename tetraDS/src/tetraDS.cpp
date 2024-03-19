@@ -31,7 +31,7 @@ extern "C"
 using namespace std;
 
 #define WHEEL_RADIUS 0.1025 //m
-#define WHEEL_DISTANCE 0.3772 //m
+#define WHEEL_DISTANCE 0.3782 //m
 #define TREAD_WIDTH 0.04 //m
 
 //serial
@@ -66,6 +66,8 @@ int joy_linear = 1.0;
 int joy_angular = 1.0;
 //Parameter data
 int m_iParam = 0;
+//just use while loop
+int error_count = 0;
 //tetra parameter read & write service
 ros::ServiceServer parameter_read_service;
 tetraDS::parameter_read param_read_cmd;
@@ -82,7 +84,13 @@ tetraDS::angular_position_move angular_move_cmd;
 //ekf_localization
 bool m_bEKF_option = false;
 bool m_bForwardCheck = false;
-
+//distance check ... add 240319 mwcha
+double ex_dBefore_Position_x = 0.0;
+double ex_dBefore_Position_y = 0.0;
+double ex_dIncrement_Distance = 0.0;
+double ex_dTotal_Distance = 0.0;
+//Motor_Error_Check ... add 240319 mwcha
+bool bMotor_Error_Check = false;
 
 class TETRA
 {
@@ -321,6 +329,20 @@ void Power_statusCallback(const std_msgs::Int32::ConstPtr& msg)
 
 }
 
+// bool CheckMotorDriverErrors(int m_left_error_code, int m_right_error_code) //240319 add by mwcha
+// {
+//     if (m_left_error_code != 48 || m_right_error_code != 48) {
+//         printf("[Motor Driver Error] Left Error Code: %d \n", m_left_error_code);
+//         printf("[Motor Driver Error] Right Error Code: %d \n", m_right_error_code);
+//         dssp_rs232_drv_module_set_drive_err_reset(); // "CG"
+//         usleep(1000);
+//         dssp_rs232_drv_module_set_servo(1); //Servo On
+//         return true; // error
+//     }
+//     return false;
+// }
+
+
 bool Parameter_Read_Command(tetraDS::parameter_read::Request  &req, 
 							tetraDS::parameter_read::Response &res)
 {
@@ -476,20 +498,20 @@ int main(int argc, char * argv[])
 	ros::NodeHandle nbumper;
 	ros::NodeHandle nemg;
 	ros::NodeHandle param;
-    	ros::Publisher tetra_battery_publisher;
+    ros::Publisher tetra_battery_publisher;
 	has_prefix=ros::param::get("tf_prefix", tf_prefix_); //tf_prefix add - 210701
 
 	//Read Conveyor Option Param Read//
-    	n.getParam("ekf_option", m_bEKF_option);
-    	printf("##ekf_option: %d \n", m_bEKF_option);
+    n.getParam("ekf_option", m_bEKF_option);
+    printf("##ekf_option: %d \n", m_bEKF_option);
 
-    	TETRA tetra;
-    	//cmd_velocity_velue//
+    TETRA tetra;
+    //cmd_velocity_value//
 	ros::Subscriber vel_sub = n.subscribe("cmd_vel",100,tetra.velCallback);
-	//acceleration_velue//
+	//acceleration_value//
 	ros::Subscriber acc_sub = n.subscribe("accel_vel",10,accelCallback);
 	//Joystick//
-    	ros::Subscriber joy_sub = njoy.subscribe<sensor_msgs::Joy>("joy", 10, joyCallback);
+    ros::Subscriber joy_sub = njoy.subscribe<sensor_msgs::Joy>("joy", 10, joyCallback);
 	ros::Subscriber vjoy_sub = vjoy.subscribe<geometry_msgs::Twist>("virtual_joystick/cmd_vel", 10, vjoyCallback);
 	//Pose Reset//_test
 	ros::Subscriber PoseReset = nReset.subscribe<std_msgs::Int32>("PoseRest",10, PoseResetCallback);
@@ -521,7 +543,7 @@ int main(int argc, char * argv[])
 	linear_position_move_service = param.advertiseService("linear_move_cmd", Linear_Move_Command);
 	angular_position_move_service = param.advertiseService("angular_move_cmd", Angular_Move_Command);
 
-    	ros::Rate loop_rate(30.0); //default: 30HZ
+    ros::Rate loop_rate(30.0); //default: 30HZ
 
 	sprintf(port, "/dev/ttyS0");
 	//RS232 Connect
@@ -561,9 +583,9 @@ int main(int argc, char * argv[])
 	printf("□□□□■□□□□■□□□□□□□□□□■□□□□■□□□□□■□□■□□□□□■□\n");
 	printf("□□□□■□□□□■■■■■■□□□□□■□□□□■□□□□□■□□■□□□□□■□\n");
 
-        while(ros::ok())
+    while(ros::ok())
 	{
-        	ros::spinOnce();
+        ros::spinOnce();
 		
 		input_linear  = linear;
 		input_angular = angular;
@@ -640,6 +662,16 @@ int main(int argc, char * argv[])
 		tetra.coordinates[1] = (m_dY_pos /1000.0);
 		tetra.coordinates[2] = m_dTheta * (M_PI/1800.0);
 
+		//add.. Distance calc
+        ex_dIncrement_Distance = sqrt(((tetra.coordinates[0] - ex_dBefore_Position_x)*(tetra.coordinates[0] - ex_dBefore_Position_x))+((tetra.coordinates[1] - ex_dBefore_Position_y)*(tetra.coordinates[1] - ex_dBefore_Position_y)));
+        ex_dTotal_Distance = ex_dTotal_Distance + ex_dIncrement_Distance;                    
+        ex_dBefore_Position_x = tetra.coordinates[0];
+        ex_dBefore_Position_y = tetra.coordinates[1];
+
+		//total Distance pub
+		total_distance.data = ex_dTotal_Distance;
+		total_distance_publisher.publish(total_distance);
+
 		if(!bPosition_mode_flag) //Velocity mode only
 		{
 			SetMoveCommand(control_linear, control_angular);
@@ -651,11 +683,31 @@ int main(int argc, char * argv[])
 		{
 			printf("[Motor Driver Error] Left Error Code: %d \n", m_left_error_code);
 			printf("[Motor Driver Error] Right Error Code: %d \n", m_right_error_code);
-			//dssp_rs232_drv_module_set_drive_err_reset(); 240314
+			//dssp_rs232_drv_module_set_drive_err_reset();
 			usleep(1000);
-			dssp_rs232_drv_module_set_servo(1); //Servo On
+			dssp_rs232_drv_module_set_servo(0); //Servo Off // dssp_rs232_drv_module_set_servo(1); //Servo On
 		}
-		if(m_bumper_data == 2 || m_bumper_data == 3) //Switch and Bumper Loop ... 230629 add by mwcha
+
+		// //Error Code Check -> Reset & servo On Loop 240319 ... add by mwcha ... but need to H/W test,, S/W has made all
+		// if (m_left_error_code != 48 || m_right_error_code != 48)
+		// {
+		// 	for (; error_count < 5; ++error_count)
+		// 	{
+		// 		if (!CheckMotorDriverErrors(m_left_error_code, m_right_error_code))
+		// 		{
+		// 			break;
+		// 		}
+		// 	}
+		// 	if (error_count >= 5) {
+		// 		printf("[Motor Driver Error] Error occurred more than 5 times! SERVO OFF! \n");
+		// 		usleep(1000); //0.001sec
+		// 		dssp_rs232_drv_module_set_servo(0); //Servo Off
+		// 		break;
+		// 	}
+		// }
+
+		//Switch and Bumper Loop ... 230629 add by mwcha
+		if(m_bumper_data == 2 || m_bumper_data == 3)
 		{
 			if(m_bflag_bumper)
 			{
@@ -679,8 +731,9 @@ int main(int argc, char * argv[])
 
 		tetra.read();
 		loop_rate.sleep();
-    }
-
+			
+	}
+	
 	//Servo Off
 	dssp_rs232_drv_module_set_servo(0);
 	printf("Servo Off \n");
@@ -690,4 +743,5 @@ int main(int argc, char * argv[])
 	printf("RS232 Disconnect \n");
 
     return 0;
+
 }
