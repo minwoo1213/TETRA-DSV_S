@@ -1680,14 +1680,14 @@ bool Depart_Station2Move(int marker_id)
                 {
                     cmd->linear.x =  0.0; 
                     cmd->angular.z = 0.0;
-                    cmdpub_.publish(cmd);
+                    //cmdpub_.publish(cmd);
                     bResult = false;
                 }
                 else
                 {
                     cmd->linear.x =  -0.05; 
                     cmd->angular.z = 0.0;
-                    cmdpub_.publish(cmd);
+                    //cmdpub_.publish(cmd);
                     bResult = false;
                 }    
             }
@@ -1695,7 +1695,7 @@ bool Depart_Station2Move(int marker_id)
             {
                 cmd->linear.x =  0.0; 
                 cmd->angular.z = 0.0;
-                cmdpub_.publish(cmd);
+                //cmdpub_.publish(cmd);
 
                 //add goto cmd call//
                 setGoal(goal);
